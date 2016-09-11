@@ -21,7 +21,7 @@ type State
   = Moving   { nextCell : Maze.Index, alpha : Float }
   | CheckOrbs
   | Choosing Float
-  | NewMaze  { oldMaze : Maze.Model, newMaze : Maze.Model, alpha : Float }
+  | NewMaze  Float
   | GameOver
 
 type alias Model =
@@ -30,6 +30,7 @@ type alias Model =
   , state       : State
   , speedBonus  : Float
   , maze        : Maze.Model
+  , newMaze     : Maze.Model
   , cell        : Maze.Index
   , shuffleOrbs : List Maze.Index
   , timeOrbs    : List Maze.Index
@@ -38,6 +39,9 @@ type alias Model =
   , fov         : Float
   , radius      : Float
   }
+
+initMaze : Maze.Model
+initMaze = Maze.init 40 40
 
 initialModel : Model
 initialModel =
@@ -49,9 +53,10 @@ initialModel =
     { x = 0
     , y = 0
     }
-  , state       = Choosing 0.7
+  , state       = NewMaze 2
   , speedBonus  = 0
-  , maze        = Maze.init 40 40
+  , maze        = initMaze
+  , newMaze     = initMaze
   , cell        = { x = 20, y = 20 }
   , shuffleOrbs = []
   , timeOrbs    = []
@@ -66,6 +71,7 @@ type Msg
   | Mouse Position
   | Step Time
   | GenMaze Maze.Model
+  | GenMazeStart Maze.Model
   | UpdateOrbs Time
 
 updateRadius : Model -> Float
@@ -142,13 +148,12 @@ update msg model =
       (Step dt, CheckOrbs) ->
         if member model.cell model.shuffleOrbs
         then
-          { model | state       = Choosing 10
-                  -- Choosing here is just in case newMaze fails, but it shouldn't
+          { model | state       = NewMaze 0.5
                   , shuffleOrbs = List.filter ((/=) model.cell) model.shuffleOrbs
                   , points      = model.points + 25
                   , timeLeft    = model.timeLeft - dt / 1000
                   , radius      = updateRadius model
-          } ! [newMaze, newOrbs]
+          } ! [newOrbs]
         else
           if member model.cell model.timeOrbs
           then
@@ -163,27 +168,25 @@ update msg model =
                     , radius   = updateRadius model
             } ! [Cmd.none]
 
-      (Step dt, NewMaze m) ->
-        (if m.alpha + dt / 1000 > 1.0
-          then
-            { model | maze     = m.newMaze
-                    , state    = Choosing 1.0 -- a bit more time than usual
-                    , timeLeft = model.timeLeft - dt / 1000
-                    , radius   = updateRadius model
-            }
-          else
-            { model | state    = NewMaze { m | alpha = m.alpha + dt / 1000 }
-                    , timeLeft = model.timeLeft - dt / 1000
-                    , radius   = updateRadius model
-            }
-        ) ! [Cmd.none]
+      (Step dt, NewMaze alpha) ->
+        if alpha + dt / 1000 > 1.0
+        then
+          ({ model | maze     = model.newMaze
+                   , state    = Choosing 2.0 -- a bit more time than usual
+                   , timeLeft = model.timeLeft - dt / 1000
+                   , radius   = updateRadius model
+          }) ! [newMaze]
+        else
+          ({ model | state    = NewMaze <| alpha + dt / 1000
+                   , timeLeft = model.timeLeft - dt / 1000
+                   , radius   = updateRadius model
+          }) ! [Cmd.none]
 
       (GenMaze m, _) ->
-        ({ model | state = NewMaze { oldMaze = model.maze
-                                   , newMaze = m
-                                   , alpha   = 0
-                                   }
-        }) ! [Cmd.none]
+        ({ model | newMaze = m }) ! [Cmd.none]
+
+      (GenMazeStart m, _) ->
+        ({ model | maze = m }) ! [Cmd.none]
 
       (UpdateOrbs t, _) ->
         let
@@ -191,7 +194,7 @@ update msg model =
           seed = initialSeed <| round t
 
           (newShuffleOrbs, newSeed) =
-            updateOrbList 20 maxIndex seed (model.cell :: model.timeOrbs) model.shuffleOrbs
+            updateOrbList 30 maxIndex seed (model.cell :: model.timeOrbs) model.shuffleOrbs
           (newTimeOrbs, _) =
             updateOrbList 30 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
         in
@@ -220,7 +223,7 @@ view model =
         }
 
       NewMaze m ->
-        { settings' | transition = Just m.newMaze }
+        { settings' | transition = Just model.newMaze }
 
       _ -> settings'
 
@@ -283,14 +286,16 @@ initialCmd : Cmd Msg
 initialCmd =
   Cmd.batch
     [ perform (\_ -> Window { width = 500, height = 500 }) Window size
-    , newMaze
     , newOrbs
+    , newMaze
+    , perform (always <| GenMazeStart initMaze) GenMazeStart
+       <| Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze)
+       <| now
     ]
 
 newMaze : Cmd Msg
-newMaze = perform (always <| GenMaze <| Maze.init 40 40) GenMaze
-       <| Task.map (\t -> Maze.generate (initialSeed <| round t)
-                       <| Maze.init 40 40)
+newMaze = perform (always <| GenMaze initMaze) GenMaze
+       <| Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze)
        <| now
 
 newOrbs : Cmd Msg
