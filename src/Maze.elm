@@ -3,10 +3,10 @@ module Maze exposing (..)
 import Random exposing (Generator, Seed, step)
 import Collage exposing (..)
 import Transform exposing (translation, multiply)
-import Color exposing (red, blue)
+import Color exposing (Color, red, blue)
 import Utils exposing (..)
 import List exposing (..)
-import List.Extra exposing (init, (!!), last, zip4, zip)
+import List.Extra exposing (init, (!!), last, zip3, zip)
 import Maybe exposing (andThen)
 import Debug
 
@@ -94,21 +94,23 @@ drawCellWalls forms cell = map snd
                         <| filter ((==) Wall << fst)
                         <| zip cell.walls forms
 
-drawTransitionWalls : List Form -> List Form -> Cell -> Cell -> List Form
-drawTransitionWalls forms formsT a b =
-  map (\(aw, bw, f, fT) -> if aw /= bw then fT else f)
-    <| filter (\(aw, bw, _, _) -> aw == Wall || bw == Wall)
-    <| zip4 a.walls b.walls forms formsT
+drawTransitionWalls : List (Form, Form, Form) -> Cell -> Cell -> List Form
+drawTransitionWalls forms a b =
+  map (\(aw, bw, (w, a, r)) -> if aw == bw
+                               then w
+                               else if aw == Wall then r else a)
+    <| filter (\(aw, bw, _) -> aw == Wall || bw == Wall)
+    <| zip3 a.walls b.walls forms
 
 -- Draw all the walls for a given radius
-drawWalls : Bool -> Float -> List Form
-drawWalls transition radius = map ( drawSegment transition radius ) [0..5]
+drawWalls : Color -> Float -> List Form
+drawWalls color radius = map ( drawSegment color radius ) [0..5]
 
 -- Draw a segment of an hexagon given a radius and the segment index
-drawSegment : Bool -> Float -> Int -> Form
-drawSegment transition radius segIndex =
+drawSegment : Color -> Float -> Int -> Form
+drawSegment color radius segIndex =
   let
-    lineStyle = solid (if transition then shuffleColor else wallColor)
+    lineStyle = solid color
   in
     traced
       { lineStyle | width = 1 }
@@ -132,16 +134,16 @@ getTransform settings =
 sqrt3 : Float
 sqrt3 = sqrt 3
 
-drawCell : Index -> Form -> List Form -> List Form -> Model -> Maybe Model -> List Form
-drawCell index hexOutline hexWalls hexWallsT model transition =
+drawCell : Index -> Form -> List (Form, Form, Form) -> Model -> Maybe Model -> List Form
+drawCell index hexOutline hexWalls model transition =
   case (getCell index model.grid, transition `andThen` (\m -> getCell index m.grid)) of
     (Nothing, _      ) -> []
 
     (Just  c, Nothing) -> (::) hexOutline
-                       <| drawCellWalls hexWalls c
+                       <| drawCellWalls (map (\(w,_,_) -> w) hexWalls) c
 
     (Just  a, Just  b) -> (::) hexOutline
-                       <| drawTransitionWalls hexWalls hexWallsT a b
+                       <| drawTransitionWalls hexWalls a b
 
 -- Main draw function
 draw : ViewSettings -> Model -> Form
@@ -149,8 +151,9 @@ draw settings model =
   let
     radius = settings.radius / settings.scale
     hexOutline = drawCellOutline radius
-    hexWalls = drawWalls False radius
-    hexWallsT = drawWalls True radius
+    hexWalls = zip3 ( drawWalls wallColor radius )
+                    ( drawWalls shuffleColor radius )
+                    ( drawWalls timeColor radius )
     (width, height) = settings.dims
     center = settings.cellA
     startX = center.x - width // 2
@@ -184,7 +187,6 @@ draw settings model =
                             { x = x, y = y }
                             hexOutline
                             hexWalls
-                            hexWallsT
                             model
                             settings.transition
                   ) [startX..endX]

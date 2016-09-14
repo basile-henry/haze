@@ -11443,14 +11443,14 @@ var _basile_henry$haze$Utils$interpolatePos = F3(
 		};
 	});
 var _basile_henry$haze$Utils$shuffleColorT = A4(_elm_lang$core$Color$rgba, 255, 73, 92, 0);
-var _basile_henry$haze$Utils$shuffleColor = A4(_elm_lang$core$Color$rgba, 255, 73, 92, 1);
+var _basile_henry$haze$Utils$shuffleColor = A3(_elm_lang$core$Color$rgb, 255, 73, 92);
 var _basile_henry$haze$Utils$backgroundColorT = A4(_elm_lang$core$Color$rgba, 252, 252, 252, 0);
-var _basile_henry$haze$Utils$backgroundColor = A4(_elm_lang$core$Color$rgba, 252, 252, 252, 1);
-var _basile_henry$haze$Utils$outlineColor = A4(_elm_lang$core$Color$rgba, 70, 35, 122, 0.2);
-var _basile_henry$haze$Utils$wallColor = A4(_elm_lang$core$Color$rgba, 61, 220, 151, 1);
-var _basile_henry$haze$Utils$hexBackgroundColor = A4(_elm_lang$core$Color$rgba, 70, 35, 122, 0.1);
+var _basile_henry$haze$Utils$backgroundColor = A3(_elm_lang$core$Color$rgb, 252, 252, 252);
+var _basile_henry$haze$Utils$outlineColor = A3(_elm_lang$core$Color$rgb, 216, 209, 226);
+var _basile_henry$haze$Utils$wallColor = A3(_elm_lang$core$Color$rgb, 61, 220, 151);
+var _basile_henry$haze$Utils$hexBackgroundColor = A3(_elm_lang$core$Color$rgb, 234, 230, 239);
 var _basile_henry$haze$Utils$timeColorT = A4(_elm_lang$core$Color$rgba, 37, 110, 255, 0);
-var _basile_henry$haze$Utils$timeColor = A4(_elm_lang$core$Color$rgba, 37, 110, 255, 1);
+var _basile_henry$haze$Utils$timeColor = A3(_elm_lang$core$Color$rgb, 37, 110, 255);
 var _basile_henry$haze$Utils$isEven = function (x) {
 	return _elm_lang$core$Native_Utils.eq(
 		A2(_elm_lang$core$Basics_ops['%'], x, 2),
@@ -12865,9 +12865,8 @@ var _basile_henry$haze$Maze$getTransform = function (settings) {
 		_evancz$elm_graphics$Transform$scale(settings.scale));
 };
 var _basile_henry$haze$Maze$drawSegment = F3(
-	function (transition, radius, segIndex) {
-		var lineStyle = _evancz$elm_graphics$Collage$solid(
-			transition ? _basile_henry$haze$Utils$shuffleColor : _basile_henry$haze$Utils$wallColor);
+	function (color, radius, segIndex) {
+		var lineStyle = _evancz$elm_graphics$Collage$solid(color);
 		return A2(
 			_evancz$elm_graphics$Collage$traced,
 			_elm_lang$core$Native_Utils.update(
@@ -12882,10 +12881,10 @@ var _basile_henry$haze$Maze$drawSegment = F3(
 					A2(_elm_lang$core$Basics_ops['%'], segIndex + 1, 6))));
 	});
 var _basile_henry$haze$Maze$drawWalls = F2(
-	function (transition, radius) {
+	function (color, radius) {
 		return A2(
 			_elm_lang$core$List$map,
-			A2(_basile_henry$haze$Maze$drawSegment, transition, radius),
+			A2(_basile_henry$haze$Maze$drawSegment, color, radius),
 			_elm_lang$core$Native_List.range(0, 5));
 	});
 var _basile_henry$haze$Maze$drawCellOutline = function (radius) {
@@ -13102,25 +13101,26 @@ var _basile_henry$haze$Maze$drawCellWalls = F2(
 				},
 				A2(_elm_community$list_extra$List_Extra$zip, cell.walls, forms)));
 	});
-var _basile_henry$haze$Maze$drawTransitionWalls = F4(
-	function (forms, formsT, a, b) {
+var _basile_henry$haze$Maze$drawTransitionWalls = F3(
+	function (forms, a, b) {
 		return A2(
 			_elm_lang$core$List$map,
 			function (_p16) {
 				var _p17 = _p16;
-				return (!_elm_lang$core$Native_Utils.eq(_p17._0, _p17._1)) ? _p17._3 : _p17._2;
+				var _p18 = _p17._0;
+				return _elm_lang$core$Native_Utils.eq(_p18, _p17._1) ? _p17._2._0 : (_elm_lang$core$Native_Utils.eq(_p18, _basile_henry$haze$Maze$Wall) ? _p17._2._2 : _p17._2._1);
 			},
 			A2(
 				_elm_lang$core$List$filter,
-				function (_p18) {
-					var _p19 = _p18;
-					return _elm_lang$core$Native_Utils.eq(_p19._0, _basile_henry$haze$Maze$Wall) || _elm_lang$core$Native_Utils.eq(_p19._1, _basile_henry$haze$Maze$Wall);
+				function (_p19) {
+					var _p20 = _p19;
+					return _elm_lang$core$Native_Utils.eq(_p20._0, _basile_henry$haze$Maze$Wall) || _elm_lang$core$Native_Utils.eq(_p20._1, _basile_henry$haze$Maze$Wall);
 				},
-				A4(_elm_community$list_extra$List_Extra$zip4, a.walls, b.walls, forms, formsT)));
+				A3(_elm_community$list_extra$List_Extra$zip3, a.walls, b.walls, forms)));
 	});
-var _basile_henry$haze$Maze$drawCell = F6(
-	function (index, hexOutline, hexWalls, hexWallsT, model, transition) {
-		var _p20 = {
+var _basile_henry$haze$Maze$drawCell = F5(
+	function (index, hexOutline, hexWalls, model, transition) {
+		var _p21 = {
 			ctor: '_Tuple2',
 			_0: A2(_basile_henry$haze$Maze$getCell, index, model.grid),
 			_1: A2(
@@ -13130,18 +13130,27 @@ var _basile_henry$haze$Maze$drawCell = F6(
 					return A2(_basile_henry$haze$Maze$getCell, index, m.grid);
 				})
 		};
-		if (_p20._0.ctor === 'Nothing') {
+		if (_p21._0.ctor === 'Nothing') {
 			return _elm_lang$core$Native_List.fromArray(
 				[]);
 		} else {
-			if (_p20._1.ctor === 'Nothing') {
+			if (_p21._1.ctor === 'Nothing') {
 				return A2(
 					F2(
 						function (x, y) {
 							return A2(_elm_lang$core$List_ops['::'], x, y);
 						}),
 					hexOutline,
-					A2(_basile_henry$haze$Maze$drawCellWalls, hexWalls, _p20._0._0));
+					A2(
+						_basile_henry$haze$Maze$drawCellWalls,
+						A2(
+							_elm_lang$core$List$map,
+							function (_p22) {
+								var _p23 = _p22;
+								return _p23._0;
+							},
+							hexWalls),
+						_p21._0._0));
 			} else {
 				return A2(
 					F2(
@@ -13149,25 +13158,28 @@ var _basile_henry$haze$Maze$drawCell = F6(
 							return A2(_elm_lang$core$List_ops['::'], x, y);
 						}),
 					hexOutline,
-					A4(_basile_henry$haze$Maze$drawTransitionWalls, hexWalls, hexWallsT, _p20._0._0, _p20._1._0));
+					A3(_basile_henry$haze$Maze$drawTransitionWalls, hexWalls, _p21._0._0, _p21._1._0));
 			}
 		}
 	});
 var _basile_henry$haze$Maze$draw = F2(
 	function (settings, model) {
 		var center = settings.cellA;
-		var _p21 = settings.dims;
-		var width = _p21._0;
-		var height = _p21._1;
+		var _p24 = settings.dims;
+		var width = _p24._0;
+		var height = _p24._1;
 		var startX = center.x - ((width / 2) | 0);
 		var endX = center.x + ((width / 2) | 0);
 		var startY = center.y - ((height / 2) | 0);
 		var endY = center.y + ((height / 2) | 0);
 		var radius = settings.radius / settings.scale;
 		var hexOutline = _basile_henry$haze$Maze$drawCellOutline(radius);
-		var hexWalls = A2(_basile_henry$haze$Maze$drawWalls, false, radius);
-		var hexWallsT = A2(_basile_henry$haze$Maze$drawWalls, true, radius);
-		return function (_p22) {
+		var hexWalls = A3(
+			_elm_community$list_extra$List_Extra$zip3,
+			A2(_basile_henry$haze$Maze$drawWalls, _basile_henry$haze$Utils$wallColor, radius),
+			A2(_basile_henry$haze$Maze$drawWalls, _basile_henry$haze$Utils$shuffleColor, radius),
+			A2(_basile_henry$haze$Maze$drawWalls, _basile_henry$haze$Utils$timeColor, radius));
+		return function (_p25) {
 			return A2(
 				_evancz$elm_graphics$Collage$groupTransform,
 				_basile_henry$haze$Maze$getTransform(settings),
@@ -13183,7 +13195,7 @@ var _basile_henry$haze$Maze$draw = F2(
 							_evancz$elm_graphics$Collage$filled,
 							_basile_henry$haze$Utils$hexBackgroundColor,
 							A2(_evancz$elm_graphics$Collage$ngon, 6, radius))),
-					_p22));
+					_p25));
 		}(
 			A2(
 				_elm_lang$core$List$map,
@@ -13203,12 +13215,11 @@ var _basile_henry$haze$Maze$draw = F2(
 										_evancz$elm_graphics$Transform$translation,
 										(1.5 * radius) * _elm_lang$core$Basics$toFloat(x),
 										_basile_henry$haze$Utils$isEven(x) ? 0 : ((_basile_henry$haze$Maze$sqrt3 / 2) * radius)),
-									A6(
+									A5(
 										_basile_henry$haze$Maze$drawCell,
 										{x: x, y: y},
 										hexOutline,
 										hexWalls,
-										hexWallsT,
 										model,
 										settings.transition));
 							},
@@ -13911,7 +13922,7 @@ var _basile_henry$haze$Main$update = F2(
 							case 'Moving':
 								var _p15 = _p11._1._0;
 								var _p14 = _p11._0._0;
-								var mt = ((1.2 + model.speedBonus) * _p14) / 1000;
+								var mt = ((1.5 * (1.0 + model.speedBonus)) * _p14) / 1000;
 								return A2(
 									_elm_lang$core$Platform_Cmd_ops['!'],
 									(_elm_lang$core$Native_Utils.cmp(_p15.alpha + mt, 1.0) > 0) ? _elm_lang$core$Native_Utils.update(
@@ -13959,7 +13970,7 @@ var _basile_henry$haze$Main$update = F2(
 									_elm_lang$core$Native_Utils.update(
 										model,
 										{
-											state: _basile_henry$haze$Main$Choosing(1.0),
+											state: _basile_henry$haze$Main$Choosing(0.7),
 											timeOrbs: A2(
 												_elm_lang$core$List$filter,
 												F2(
@@ -13967,7 +13978,7 @@ var _basile_henry$haze$Main$update = F2(
 														return !_elm_lang$core$Native_Utils.eq(x, y);
 													})(model.cell),
 												model.timeOrbs),
-											timeLeft: A2(_elm_lang$core$Basics$min, 150, (model.timeLeft + 50) - (_p16 / 1000)),
+											timeLeft: A2(_elm_lang$core$Basics$min, 150, (model.timeLeft + 30) - (_p16 / 1000)),
 											radius: _basile_henry$haze$Main$updateRadius(model)
 										}),
 									_elm_lang$core$Native_List.fromArray(
@@ -13976,7 +13987,7 @@ var _basile_henry$haze$Main$update = F2(
 									_elm_lang$core$Native_Utils.update(
 										model,
 										{
-											state: _basile_henry$haze$Main$Choosing(0.7),
+											state: _basile_henry$haze$Main$Choosing(0.5),
 											timeLeft: model.timeLeft - (_p16 / 1000),
 											radius: _basile_henry$haze$Main$updateRadius(model)
 										}),
@@ -14050,7 +14061,7 @@ var _basile_henry$haze$Main$update = F2(
 							var newSeed = _p19._1;
 							var _p20 = A5(
 								_basile_henry$haze$Main$updateOrbList,
-								30,
+								60,
 								maxIndex,
 								newSeed,
 								A2(_elm_lang$core$List_ops['::'], model.cell, newShuffleOrbs),

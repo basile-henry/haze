@@ -21,28 +21,28 @@ isEven : Int -> Bool
 isEven x = x % 2 == 0
 
 timeColor : Color
-timeColor = rgba 37 110 255 1
+timeColor = rgb 37 110 255
 
 timeColorT : Color
 timeColorT = rgba 37 110 255 0
 
 hexBackgroundColor : Color
-hexBackgroundColor = rgba 70 35 122 0.1
+hexBackgroundColor = rgb 234 230 239
 
 wallColor : Color
-wallColor = rgba 61 220 151 1
+wallColor = rgb 61 220 151
 
 outlineColor : Color
-outlineColor = rgba 70 35 122 0.2
+outlineColor = rgb 216 209 226
 
 backgroundColor : Color
-backgroundColor = rgba 252 252 252 1
+backgroundColor = rgb 252 252 252
 
 backgroundColorT : Color
 backgroundColorT = rgba 252 252 252 0
 
 shuffleColor : Color
-shuffleColor = rgba 255 73 92 1
+shuffleColor = rgb 255 73 92
 
 shuffleColorT : Color
 shuffleColorT = rgba 255 73 92 0

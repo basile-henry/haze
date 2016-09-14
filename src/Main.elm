@@ -128,7 +128,7 @@ update msg model =
 
       (Step dt, Moving mov) ->
         let
-          mt = (1.2 + model.speedBonus) * dt / 1000
+          mt = 1.5 * (1.0 + model.speedBonus) * dt / 1000
         in
           (if mov.alpha + mt > 1.0
             then
@@ -157,13 +157,13 @@ update msg model =
         else
           if member model.cell model.timeOrbs
           then
-            { model | state    = Choosing 1.0 -- a bit more time than usual
+            { model | state    = Choosing 0.7 -- a bit more time than usual
                     , timeOrbs = List.filter ((/=) model.cell) model.timeOrbs
-                    , timeLeft = min 150 <| model.timeLeft + 50 - dt / 1000
+                    , timeLeft = min 150 <| model.timeLeft + 30 - dt / 1000
                     , radius   = updateRadius model
             } ! [newOrbs]
           else
-            { model | state    = Choosing 0.7
+            { model | state    = Choosing 0.5
                     , timeLeft = model.timeLeft - dt / 1000
                     , radius   = updateRadius model
             } ! [Cmd.none]
@@ -196,7 +196,7 @@ update msg model =
           (newShuffleOrbs, newSeed) =
             updateOrbList 30 maxIndex seed (model.cell :: model.timeOrbs) model.shuffleOrbs
           (newTimeOrbs, _) =
-            updateOrbList 30 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
+            updateOrbList 60 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
         in
           ({ model | shuffleOrbs = Debug.log "shuffle" newShuffleOrbs
                    , timeOrbs    = Debug.log "time"    newTimeOrbs
