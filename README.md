@@ -2,9 +2,9 @@
 
 Haze is a simple maze game on hexagonal tiles, the aim is to keep on roaming the maze for as long as possible collecting points on the way.
 
-The game is available online at [basile-henry.github.io/haze/](https://basile-henry.github.io/haze/).
+The game is available online at [https://basile-henry.github.io/haze/](https://basile-henry.github.io/haze/).
 
-![](haze.png)
+![](res/haze.png)
 
 ## How to play
 

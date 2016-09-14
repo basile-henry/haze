@@ -87,7 +87,7 @@ update msg model =
 
       (Window s, _) ->
         let
-          fov = min (toFloat s.width/2) (toFloat s.height/2)
+          fov = 0.95 * min (toFloat s.width/2) (toFloat s.height/2)
         in
           { model | windowSize = s
                   , fov        = fov
@@ -151,7 +151,7 @@ update msg model =
           { model | state       = NewMaze 0.5
                   , shuffleOrbs = List.filter ((/=) model.cell) model.shuffleOrbs
                   , points      = model.points + 25
-                  , timeLeft    = model.timeLeft - dt / 1000
+                  , timeLeft    = Debug.log "NewMaze at:" <| model.timeLeft - dt / 1000
                   , radius      = updateRadius model
           } ! [newOrbs]
         else
@@ -169,11 +169,11 @@ update msg model =
             } ! [Cmd.none]
 
       (Step dt, NewMaze alpha) ->
-        if alpha + dt / 1000 > 1.0
+        if alpha + dt / 1000 > 0.5
         then
           ({ model | maze     = model.newMaze
                    , state    = Choosing 2.0 -- a bit more time than usual
-                   , timeLeft = model.timeLeft - dt / 1000
+                   , timeLeft = Debug.log "Gen new maze at:" <| model.timeLeft - dt / 1000
                    , radius   = updateRadius model
           }) ! [newMaze]
         else
@@ -198,8 +198,8 @@ update msg model =
           (newTimeOrbs, _) =
             updateOrbList 60 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
         in
-          ({ model | shuffleOrbs = Debug.log "shuffle" newShuffleOrbs
-                   , timeOrbs    = Debug.log "time"    newTimeOrbs
+          ({ model | shuffleOrbs = newShuffleOrbs
+                   , timeOrbs    = newTimeOrbs
           }) ! [Cmd.none]
 
 view : Model -> Html Msg
@@ -252,12 +252,12 @@ view model =
              <| ngon 3 (0.8 * r)
          , gradient
              (radial
-                (0, 0) (0.8 * model.fov)
+                (0, 0) (0.7 * model.fov)
                 (0, 0) model.fov
                 [(0, backgroundColorT), (1.0, backgroundColor)])
              (rect (toFloat w) (toFloat h))
          ] ++ shuffleOrbsF ++ timeOrbsF ++
-         [ moveY (toFloat h/2 - 20)
+         [ moveY (model.fov - 20)
              <| Collage.text
              <| Text.color lightCharcoal
              <| Text.height 30
