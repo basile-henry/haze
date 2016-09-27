@@ -82,7 +82,7 @@ init w h =
 drawCellOutline : Float -> Form
 drawCellOutline radius =
   let
-    lineStyle = dotted outlineColor
+    lineStyle = solid outlineColor
   in
     traced
       { lineStyle | width = 0.5 }

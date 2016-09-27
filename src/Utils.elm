@@ -58,11 +58,15 @@ interpolateInt a b dt = round
                           (toFloat b)
                           dt
 
-interpolateColor : Color -> Color -> Float -> Color
-interpolateColor a b dt =
+interpolateColor : Bool -> Color -> Color -> Float -> Color
+interpolateColor reverseHue a b dt =
   let
     ca = toHsl a
-    cb = toHsl b
+    t  = toHsl b
+    cb =
+      if reverseHue
+      then { t | hue = t.hue + degrees 360 }
+      else t
   in
     hsla
       (interpolateFloat ca.hue        cb.hue        dt)
