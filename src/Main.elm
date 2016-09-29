@@ -331,11 +331,11 @@ view model =
                         [ Maze.draw
                             settings
                             model.maze
-                        , ngon 3 (0.8 * r)
+                        , player
                             |> filled
                                 (interpolateColor True shuffleColor wallColor <| Ease.inOutSine model.speedBonus)
+                            |> scale r
                             |> rotate (atan2 y x)
-                            |> move ( 0, 0 )
                         , gradient
                             (radial
                                 ( 0, 0 )
@@ -368,6 +368,25 @@ view model =
                                else
                                 []
             ]
+
+
+player : Shape
+player =
+    let
+        f n i =
+            let
+                a =
+                    (degrees 130) + (degrees 100) * i / n
+            in
+                ( negate (0.7 * cos a + 1.1), 0.7 * sin a )
+
+        a =
+            degrees 120
+
+        ( dx, dy ) =
+            ( cos a, sin a )
+    in
+        polygon <| ( 1, 0 ) :: ( dx, dy ) :: List.map (f 10) [0..10] ++ [ ( dx, -dy ) ]
 
 
 subscriptions : Model -> Sub Msg
