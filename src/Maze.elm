@@ -43,8 +43,8 @@ type alias Model =
 
 type alias ViewSettings =
     { radius : Float
-    , cellA : Index
-    , cellB : Index
+    , cellFrom : Index
+    , cellTo : Maybe Index
     , alpha : Float
     , scale : Float
     , dims : ( Int, Int )
@@ -61,8 +61,8 @@ type alias ViewSettings =
 defaultViewSettings : ViewSettings
 defaultViewSettings =
     { radius = 15
-    , cellA = { x = 0, y = 0 }
-    , cellB = { x = 0, y = 0 }
+    , cellFrom = { x = 0, y = 0 }
+    , cellTo = Nothing
     , alpha = 0
     , scale = 2
     , dims = ( 15, 15 )
@@ -169,10 +169,12 @@ getTransform : ViewSettings -> Transform.Transform
 getTransform settings =
     let
         a =
-            getCellPos (settings.radius) settings.cellA
+            getCellPos (settings.radius) settings.cellFrom
 
         b =
-            getCellPos (settings.radius) settings.cellB
+            settings.cellTo
+                |> Maybe.map (getCellPos settings.radius)
+                |> Maybe.withDefault a
 
         ( dx, dy ) =
             interpolatePos a b settings.alpha
@@ -224,7 +226,7 @@ draw settings model =
             settings.dims
 
         center =
-            settings.cellA
+            settings.cellFrom
 
         ( startX, startY ) =
             ( center.x - width // 2
@@ -237,9 +239,14 @@ draw settings model =
             )
 
         highlightedCell =
-            ngon 6 radius
-                |> filled hexBackgroundColor
-                |> move (getCellPos radius settings.cellB)
+            case settings.cellTo of
+                Nothing ->
+                    group []
+
+                Just c ->
+                    ngon 6 radius
+                        |> filled hexBackgroundColor
+                        |> move (getCellPos radius c)
     in
         groupTransform
             (getTransform settings)
@@ -299,13 +306,44 @@ getCellPos radius index =
             ( newX, newY + sqrt3 / 2 * radius )
 
 
-getRelativeCellPos : Float -> Pos -> Index -> Pos
-getRelativeCellPos radius ( x, y ) index =
+getRelativeCellPos : ( Int, Int ) -> Float -> Pos -> Index -> Pos
+getRelativeCellPos ( w_, h_ ) radius ( x, y ) index =
     let
-        ( newX, newY ) =
+        ( w, h ) =
+            ( 1.5 * radius * toFloat w_, sqrt3 * radius * toFloat h_ )
+
+        ( cx, cy ) =
             getCellPos radius index
+
+        sqrtDist ( a, b ) ( c, d ) =
+            let
+                x =
+                    a - c
+
+                y =
+                    b - d
+            in
+                x * x + y * y
+
+        candidates =
+            [ ( x, y )
+            , ( x + w, y )
+            , ( x - w, y )
+            , ( x + w, y + h )
+            , ( x + w, y - h )
+            , ( x - w, y + h )
+            , ( x - w, y - h )
+            , ( x, y + h )
+            , ( x, y - h )
+            ]
+
+        ( x_, y_ ) =
+            candidates
+                |> sortBy (sqrtDist ( cx, cy ))
+                |> head
+                |> Maybe.withDefault ( x, y )
     in
-        ( newX - x, newY - y )
+        ( cx - x_, cy - y_ )
 
 
 
@@ -321,13 +359,32 @@ getPos radius index =
         ( radius * cos angle, radius * sin angle )
 
 
+getModuloIndex : List (List Cell) -> Index -> Index
+getModuloIndex grid i =
+    case grid of
+        [] ->
+            Index 0 0
+
+        -- technically wrong but will be caught later on
+        [] :: _ ->
+            Index 0 0
+
+        -- technically wrong but will be caught later on
+        row :: _ ->
+            Index (i.x % length row) (i.y % length grid)
+
+
 
 -- Get a cell from the grid if it exists
 
 
 getCell : Index -> List (List Cell) -> Maybe Cell
 getCell i grid =
-    (grid !! i.y) |> andThen (\r -> r !! i.x)
+    let
+        { x, y } =
+            getModuloIndex grid i
+    in
+        (grid !! y) |> andThen (\r -> r !! x)
 
 
 
@@ -337,15 +394,18 @@ getCell i grid =
 modifyCell : (Cell -> Cell) -> Index -> List (List Cell) -> List (List Cell)
 modifyCell f i grid =
     let
+        { x, y } =
+            getModuloIndex grid i
+
         maybeGrid =
             Maybe.map2
                 (\c r ->
-                    take i.y grid
-                        ++ [ take i.x r ++ [ f c ] ++ drop (i.x + 1) r ]
-                        ++ drop (i.y + 1) grid
+                    take y grid
+                        ++ [ take x r ++ [ f c ] ++ drop (x + 1) r ]
+                        ++ drop (y + 1) grid
                 )
                 (getCell i grid)
-                (grid !! i.y)
+                (grid !! y)
     in
         case maybeGrid of
             Nothing ->

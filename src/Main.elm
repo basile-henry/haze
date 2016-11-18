@@ -5,6 +5,7 @@ import Html.Attributes exposing (style, attribute, class, href)
 import Task exposing (..)
 import Window exposing (..)
 import Mouse exposing (..)
+import Keyboard
 import Color exposing (..)
 import Element exposing (toHtml, color)
 import Collage exposing (..)
@@ -24,6 +25,7 @@ type State
     | Choosing Float
     | NewMaze Float
     | GameOver
+    | Pause State
 
 
 type alias Model =
@@ -43,9 +45,17 @@ type alias Model =
     }
 
 
+
+-- These need to be even (for consistancy throughout the code base)
+
+
+( mazeWidth, mazeHeight ) =
+    ( 18, 18 )
+
+
 initMaze : Maze.Model
 initMaze =
-    Maze.init 40 40
+    Maze.init mazeWidth mazeHeight
 
 
 initialModel : Model
@@ -58,11 +68,11 @@ initialModel =
         { x = 0
         , y = 0
         }
-    , state = NewMaze 2
+    , state = NewMaze 0.7
     , speedBonus = 0
     , maze = initMaze
     , newMaze = initMaze
-    , cell = { x = 20, y = 20 }
+    , cell = { x = 10, y = 10 }
     , shuffleOrbs = []
     , timeOrbs = []
     , points = 0
@@ -79,11 +89,21 @@ type Msg
     | GenMaze Maze.Model
     | GenMazeStart Maze.Model
     | UpdateOrbs Time
+    | TogglePause
 
 
 updateRadius : Model -> Float
 updateRadius model =
     0.5 * model.radius + 0.5 * model.fov * 15 / model.timeLeft
+
+
+updateTimeLeft : Model -> Float -> Float
+updateTimeLeft model dt =
+    let
+        mult =
+            1 + 4 * (min 1500 <| toFloat model.points) / 1500
+    in
+        model.timeLeft - (mult * dt / 1000)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -92,6 +112,15 @@ update msg model =
         { model | state = GameOver } ! [ Cmd.none ]
     else
         case ( msg, model.state ) of
+            ( TogglePause, Pause savedState ) ->
+                { model | state = savedState } ! [ Cmd.none ]
+
+            ( TogglePause, _ ) ->
+                { model | state = Pause model.state } ! [ Cmd.none ]
+
+            ( _, Pause _ ) ->
+                model ! [ Cmd.none ]
+
             ( _, GameOver ) ->
                 model ! [ Cmd.none ]
 
@@ -142,7 +171,7 @@ update msg model =
                                     min 1.0 <| model.speedBonus + 0.03
                                 else
                                     0
-                            , timeLeft = model.timeLeft - dt / 1000
+                            , timeLeft = updateTimeLeft model dt
                             , radius = updateRadius model
                         }
                      else
@@ -153,7 +182,7 @@ update msg model =
                                     model.speedBonus
                                 else
                                     0
-                            , timeLeft = model.timeLeft - dt / 1000
+                            , timeLeft = updateTimeLeft model dt
                             , radius = updateRadius model
                         }
                     )
@@ -167,15 +196,15 @@ update msg model =
                     (if mov.alpha + mt > 1.0 then
                         { model
                             | state = CheckOrbs
-                            , cell = mov.nextCell
+                            , cell = Maze.getModuloIndex model.maze.grid mov.nextCell
                             , points = model.points + 1
-                            , timeLeft = model.timeLeft - dt / 1000
+                            , timeLeft = updateTimeLeft model dt
                             , radius = updateRadius model
                         }
                      else
                         { model
                             | state = Moving { mov | alpha = mov.alpha + mt }
-                            , timeLeft = model.timeLeft - dt / 1000
+                            , timeLeft = updateTimeLeft model dt
                             , radius = updateRadius model
                         }
                     )
@@ -184,10 +213,10 @@ update msg model =
             ( Step dt, CheckOrbs ) ->
                 if member model.cell model.shuffleOrbs then
                     { model
-                        | state = NewMaze 0.5
+                        | state = NewMaze 0.7
                         , shuffleOrbs = List.filter ((/=) model.cell) model.shuffleOrbs
                         , points = model.points + 25
-                        , timeLeft = Debug.log "NewMaze at:" <| model.timeLeft - dt / 1000
+                        , timeLeft = updateTimeLeft model dt
                         , radius = updateRadius model
                     }
                         ! [ newOrbs ]
@@ -204,27 +233,25 @@ update msg model =
                 else
                     { model
                         | state = Choosing 0.5
-                        , timeLeft = model.timeLeft - dt / 1000
+                        , timeLeft = updateTimeLeft model dt
                         , radius = updateRadius model
                     }
                         ! [ Cmd.none ]
 
             ( Step dt, NewMaze alpha ) ->
-                if alpha + dt / 1000 > 0.5 then
+                if alpha < 0.0 then
                     ({ model
                         | maze = model.newMaze
                         , state =
-                            Choosing 2.0
+                            Choosing 0.7
                             -- a bit more time than usual
-                        , timeLeft = Debug.log "Gen new maze at:" <| model.timeLeft - dt / 1000
                         , radius = updateRadius model
                      }
                     )
                         ! [ newMaze ]
                 else
                     ({ model
-                        | state = NewMaze <| alpha + dt / 1000
-                        , timeLeft = model.timeLeft - dt / 1000
+                        | state = NewMaze <| alpha - (dt / 1000)
                         , radius = updateRadius model
                      }
                     )
@@ -239,16 +266,16 @@ update msg model =
             ( UpdateOrbs t, _ ) ->
                 let
                     maxIndex =
-                        { x = 39, y = 39 }
+                        Maze.Index (mazeWidth - 1) (mazeHeight - 1)
 
                     seed =
                         initialSeed <| round t
 
                     ( newShuffleOrbs, newSeed ) =
-                        updateOrbList 30 maxIndex seed (model.cell :: model.timeOrbs) model.shuffleOrbs
+                        updateOrbList 15 maxIndex seed (model.cell :: model.timeOrbs) model.shuffleOrbs
 
                     ( newTimeOrbs, _ ) =
-                        updateOrbList 60 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
+                        updateOrbList 20 maxIndex newSeed (model.cell :: newShuffleOrbs) model.timeOrbs
                 in
                     ({ model
                         | shuffleOrbs = newShuffleOrbs
@@ -277,7 +304,7 @@ view model =
         settings_ =
             { settings__
                 | radius = model.radius
-                , cellA = model.cell
+                , cellFrom = model.cell
                 , alpha = 0
             }
 
@@ -285,8 +312,8 @@ view model =
             case model.state of
                 Moving mov ->
                     { settings_
-                        | cellA = model.cell
-                        , cellB = mov.nextCell
+                        | cellFrom = model.cell
+                        , cellTo = Just mov.nextCell
                         , alpha = Ease.inOutQuad mov.alpha
                     }
 
@@ -306,15 +333,18 @@ view model =
         pos =
             interpolatePos
                 (Maze.getCellPos settings.radius model.cell)
-                (Maze.getCellPos settings.radius settings.cellB)
+                (settings.cellTo
+                    |> Maybe.withDefault model.cell
+                    |> Maze.getCellPos settings.radius
+                )
                 settings.alpha
 
         shuffleOrbsF =
-            List.map (func shuffleColor shuffleColorT << Maze.getRelativeCellPos settings.radius pos) <|
+            List.map (func shuffleColor shuffleColorT << Maze.getRelativeCellPos ( mazeWidth, mazeHeight ) settings.radius pos) <|
                 model.shuffleOrbs
 
         timeOrbsF =
-            List.map (func timeColor timeColorT << Maze.getRelativeCellPos settings.radius pos) <|
+            List.map (func timeColor timeColorT << Maze.getRelativeCellPos ( mazeWidth, mazeHeight ) settings.radius pos) <|
                 model.timeOrbs
     in
         div
@@ -356,16 +386,27 @@ view model =
                                     |> Collage.text
                                     |> moveY (model.fov - 20)
                                ]
-                            ++ if model.state == GameOver then
-                                [ "Game Over"
-                                    |> fromString
-                                    |> monospace
-                                    |> Text.height 80
-                                    |> Text.color lightCharcoal
-                                    |> Collage.text
-                                ]
-                               else
-                                []
+                            ++ case model.state of
+                                GameOver ->
+                                    [ "Game Over"
+                                        |> fromString
+                                        |> monospace
+                                        |> Text.height 80
+                                        |> Text.color lightCharcoal
+                                        |> Collage.text
+                                    ]
+
+                                Pause _ ->
+                                    [ "Pause"
+                                        |> fromString
+                                        |> monospace
+                                        |> Text.height 80
+                                        |> Text.color lightCharcoal
+                                        |> Collage.text
+                                    ]
+
+                                _ ->
+                                    []
             ]
 
 
@@ -394,6 +435,7 @@ subscriptions model =
         [ resizes Window
         , moves Mouse
         , diffs Step
+        , Keyboard.downs (always TogglePause)
         ]
 
 
@@ -454,19 +496,23 @@ updateOrbList len maxIndex seed blacklist list =
 drawOrbs : Float -> Float -> Time -> Color -> Color -> Pos -> Form
 drawOrbs radius maxRadius t f b ( x, y ) =
     let
-        dist =
-            sqrt <| x * x + y * y
+        sqrDist =
+            x * x + y * y
 
         pos =
-            if dist > maxRadius then
-                ( maxRadius * x / dist
-                , maxRadius * y / dist
-                )
+            if sqrDist > maxRadius * maxRadius then
+                let
+                    d =
+                        sqrt sqrDist
+                in
+                    ( maxRadius * x / d
+                    , maxRadius * y / d
+                    )
             else
                 ( x, y )
 
         r =
-            radius * (0.2 + (abs <| sin t) * max 0 (2 * maxRadius - dist) / maxRadius)
+            radius * (0.2 + (abs <| sin (t * 0.6)) * max 0 (2 * maxRadius * maxRadius - sqrDist) / (maxRadius * maxRadius))
 
         g =
             radial ( 0, 0 ) (0.1 * radius) ( 0, 0 ) r [ ( 0, f ), ( 0.9, b ) ]
