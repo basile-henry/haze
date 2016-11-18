@@ -1,6 +1,5 @@
 module Main exposing (..)
 
-import Html.App as Html
 import Html exposing (..)
 import Html.Attributes exposing (style, attribute, class, href)
 import Task exposing (..)
@@ -272,11 +271,11 @@ view model =
             , toFloat h / 2 - toFloat model.mousePos.y
             )
 
-        settings'' =
+        settings__ =
             Maze.defaultViewSettings
 
-        settings' =
-            { settings''
+        settings_ =
+            { settings__
                 | radius = model.radius
                 , cellA = model.cell
                 , alpha = 0
@@ -285,17 +284,17 @@ view model =
         settings =
             case model.state of
                 Moving mov ->
-                    { settings'
+                    { settings_
                         | cellA = model.cell
                         , cellB = mov.nextCell
                         , alpha = Ease.inOutQuad mov.alpha
                     }
 
                 NewMaze m ->
-                    { settings' | transition = Just model.newMaze }
+                    { settings_ | transition = Just model.newMaze }
 
                 _ ->
-                    settings'
+                    settings_
 
         r =
             settings.radius / settings.scale
@@ -386,7 +385,7 @@ player =
         ( dx, dy ) =
             ( cos a, sin a )
     in
-        polygon <| ( 1, 0 ) :: ( dx, dy ) :: List.map (f 10) [0..10] ++ [ ( dx, -dy ) ]
+        polygon <| ( 1, 0 ) :: ( dx, dy ) :: List.map (f 10 << toFloat) (List.range 0 10) ++ [ ( dx, -dy ) ]
 
 
 subscriptions : Model -> Sub Msg
@@ -401,10 +400,10 @@ subscriptions model =
 initialCmd : Cmd Msg
 initialCmd =
     Cmd.batch
-        [ perform (\_ -> Window { width = 500, height = 500 }) Window size
+        [ perform Window size
         , newOrbs
         , newMaze
-        , perform (always <| GenMazeStart initMaze) GenMazeStart <|
+        , perform GenMazeStart <|
             Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze) <|
                 now
         ]
@@ -412,14 +411,14 @@ initialCmd =
 
 newMaze : Cmd Msg
 newMaze =
-    perform (always <| GenMaze initMaze) GenMaze <|
+    perform GenMaze <|
         Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze) <|
             now
 
 
 newOrbs : Cmd Msg
 newOrbs =
-    perform (always <| UpdateOrbs 0) UpdateOrbs now
+    perform UpdateOrbs now
 
 
 indexGen : Maze.Index -> Random.Generator Maze.Index
@@ -475,9 +474,9 @@ drawOrbs radius maxRadius t f b ( x, y ) =
         move pos <| gradient g <| circle r
 
 
-main : Program Never
+main : Program Never Model Msg
 main =
-    Html.program
+    program
         { init = ( initialModel, initialCmd )
         , update = update
         , view = view

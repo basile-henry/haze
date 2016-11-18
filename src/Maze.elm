@@ -6,6 +6,7 @@ import Transform exposing (translation, multiply)
 import Color exposing (Color, red, blue)
 import Utils exposing (..)
 import List exposing (..)
+import Tuple exposing (..)
 import List.Extra exposing (init, (!!), last, zip3, zip)
 import Maybe exposing (andThen)
 import Debug
@@ -112,8 +113,8 @@ drawCellOutline radius =
 
 drawCellWalls : List Form -> Cell -> List Form
 drawCellWalls forms cell =
-    map snd <|
-        filter ((==) Wall << fst) <|
+    map second <|
+        filter ((==) Wall << first) <|
             zip cell.walls forms
 
 
@@ -139,7 +140,7 @@ drawTransitionWalls forms a b =
 
 drawWalls : Color -> Float -> List Form
 drawWalls color radius =
-    map (drawSegment color radius) [0..5]
+    map (drawSegment color radius) (range 0 5)
 
 
 
@@ -188,7 +189,7 @@ sqrt3 =
 
 drawCell : Index -> Form -> List ( Form, Form, Form ) -> Model -> Maybe Model -> List Form
 drawCell index hexOutline hexWalls model transition =
-    case ( getCell index model.grid, transition `andThen` (\m -> getCell index m.grid) ) of
+    case ( getCell index model.grid, transition |> andThen (\m -> getCell index m.grid) ) of
         ( Nothing, _ ) ->
             []
 
@@ -271,9 +272,9 @@ draw settings model =
                                         model
                                         settings.transition
                             )
-                            [startX..endX]
+                            (range startX endX)
                 )
-                [startY..endY]
+                (range startY endY)
 
 
 
@@ -286,25 +287,25 @@ draw settings model =
 getCellPos : Float -> Index -> Pos
 getCellPos radius index =
     let
-        x' =
+        newX =
             1.5 * radius * toFloat index.x
 
-        y' =
+        newY =
             sqrt3 * radius * toFloat index.y
     in
         if isEven index.x then
-            ( x', y' )
+            ( newX, newY )
         else
-            ( x', y' + sqrt3 / 2 * radius )
+            ( newX, newY + sqrt3 / 2 * radius )
 
 
 getRelativeCellPos : Float -> Pos -> Index -> Pos
 getRelativeCellPos radius ( x, y ) index =
     let
-        ( x', y' ) =
+        ( newX, newY ) =
             getCellPos radius index
     in
-        ( x' - x, y' - y )
+        ( newX - x, newY - y )
 
 
 
@@ -326,7 +327,7 @@ getPos radius index =
 
 getCell : Index -> List (List Cell) -> Maybe Cell
 getCell i grid =
-    (grid !! i.y) `andThen` (\r -> r !! i.x)
+    (grid !! i.y) |> andThen (\r -> r !! i.x)
 
 
 
@@ -400,7 +401,7 @@ getNeighbours : Index -> List ( Int, Index )
 getNeighbours index =
     map
         (\i -> ( i, getNeighbour index i ))
-        [0..5]
+        (range 0 5)
 
 
 
@@ -412,8 +413,8 @@ validDirections model index =
     filterMap
         (\i ->
             (getCell index model.grid)
-                `andThen` (\c -> c.walls !! i)
-                `andThen`
+                |> andThen (\c -> c.walls !! i)
+                |> andThen
                     (\w ->
                         if w == Open then
                             Just i
@@ -421,7 +422,7 @@ validDirections model index =
                             Nothing
                     )
         )
-        [0..5]
+        (range 0 5)
 
 
 
@@ -437,7 +438,7 @@ availableNeighbours model =
     filterMap
         (\( i, index ) ->
             (getCell index model.grid)
-                `andThen`
+                |> andThen
                     (\c ->
                         if c.visited then
                             Nothing

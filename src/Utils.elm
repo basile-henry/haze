@@ -11,8 +11,8 @@ type alias Pos =
 indexedFilterMap : (Int -> a -> Maybe b) -> List a -> List b
 indexedFilterMap f list =
     let
-        indexedFilterMap' : (Int -> a -> Maybe b) -> List a -> Int -> List b
-        indexedFilterMap' f list i =
+        helper : (Int -> a -> Maybe b) -> List a -> Int -> List b
+        helper f list i =
             case list of
                 [] ->
                     []
@@ -20,12 +20,12 @@ indexedFilterMap f list =
                 a :: xs ->
                     case f i a of
                         Nothing ->
-                            indexedFilterMap' f xs (i + 1)
+                            helper f xs (i + 1)
 
                         Just b ->
-                            b :: indexedFilterMap' f xs (i + 1)
+                            b :: helper f xs (i + 1)
     in
-        indexedFilterMap' f list 0
+        helper f list 0
 
 
 isEven : Int -> Bool
