@@ -492,7 +492,7 @@ generate seed model =
             pickNext seed model
 
         anyLeft =
-            any (\r -> any (.visited) r) model.grid
+            any (any .visited) model.grid
     in
         case ( anyLeft, n, last model.stack ) of
             ( False, _, _ ) ->
