@@ -68,7 +68,7 @@ initialModel =
         { x = 0
         , y = 0
         }
-    , state = NewMaze 0.7
+    , state = Choosing 2.0
     , speedBonus = 0
     , maze = initMaze
     , newMaze = initMaze
@@ -404,6 +404,20 @@ view model =
                                         |> Text.color lightCharcoal
                                         |> Collage.text
                                     ]
+
+                                NewMaze alpha ->
+                                    let
+                                        m =
+                                            5 * (0.7 - alpha)
+                                    in
+                                        [ "+25"
+                                            |> fromString
+                                            |> monospace
+                                            |> Text.height 30
+                                            |> Text.color lightCharcoal
+                                            |> Collage.text
+                                            |> Collage.move ( 20 * m, m ^ 4 )
+                                        ]
 
                                 _ ->
                                     []
