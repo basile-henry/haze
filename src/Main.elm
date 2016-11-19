@@ -29,8 +29,8 @@ type State
 
 
 type alias Model =
-    { windowSize : Size
-    , mousePos : Position
+    { windowSize : ( Float, Float )
+    , mousePos : Pos
     , state : State
     , speedBonus : Float
     , maze : Maze.Model
@@ -53,6 +53,11 @@ type alias Model =
     ( 18, 18 )
 
 
+winScale : Float
+winScale =
+    0.98
+
+
 initMaze : Maze.Model
 initMaze =
     Maze.init mazeWidth mazeHeight
@@ -60,14 +65,8 @@ initMaze =
 
 initialModel : Model
 initialModel =
-    { windowSize =
-        { width = 0
-        , height = 0
-        }
-    , mousePos =
-        { x = 0
-        , y = 0
-        }
+    { windowSize = ( 0, 0 )
+    , mousePos = ( 0, 0 )
     , state = Choosing 2.0
     , speedBonus = 0
     , maze = initMaze
@@ -83,8 +82,8 @@ initialModel =
 
 
 type Msg
-    = Window Size
-    | Mouse Position
+    = Window ( Float, Float )
+    | Mouse Pos
     | Step Time
     | GenMaze Maze.Model
     | GenMazeStart Maze.Model
@@ -126,8 +125,11 @@ update msg model =
 
             ( Window s, _ ) ->
                 let
+                    ( w, h ) =
+                        s
+
                     fov =
-                        0.95 * min (toFloat s.width / 2) (toFloat s.height / 2)
+                        0.95 * min (w / 2) (h / 2)
                 in
                     { model
                         | windowSize = s
@@ -141,13 +143,14 @@ update msg model =
             ( Step dt, Choosing coolDown ) ->
                 let
                     ( w, h ) =
-                        ( model.windowSize.width
-                        , model.windowSize.height
-                        )
+                        model.windowSize
+
+                    ( mx, my ) =
+                        model.mousePos
 
                     ( x, y ) =
-                        ( toFloat model.mousePos.x - toFloat w / 2
-                        , toFloat h / 2 - toFloat model.mousePos.y
+                        ( mx - w / 2
+                        , h / 2 - my
                         )
 
                     angle =
@@ -261,7 +264,7 @@ update msg model =
                 ({ model | newMaze = m }) ! [ Cmd.none ]
 
             ( GenMazeStart m, _ ) ->
-                ({ model | maze = m }) ! [ Cmd.none ]
+                ({ model | maze = m }) ! [ newMaze ]
 
             ( UpdateOrbs t, _ ) ->
                 let
@@ -289,13 +292,14 @@ view : Model -> Html Msg
 view model =
     let
         ( w, h ) =
-            ( model.windowSize.width
-            , model.windowSize.height
-            )
+            model.windowSize
+
+        ( mx, my ) =
+            model.mousePos
 
         ( x, y ) =
-            ( toFloat model.mousePos.x - toFloat w / 2
-            , toFloat h / 2 - toFloat model.mousePos.y
+            ( mx - w / 2
+            , h / 2 - my
             )
 
         settings__ =
@@ -356,7 +360,7 @@ view model =
             ]
             [ toHtml <|
                 color backgroundColor <|
-                    collage w h <|
+                    collage (floor w) (floor h) <|
                         [ Maze.draw
                             settings
                             model.maze
@@ -373,7 +377,7 @@ view model =
                                 model.fov
                                 [ ( 0, backgroundColorT ), ( 1.0, backgroundColor ) ]
                             )
-                            (rect (toFloat w) (toFloat h))
+                            (rect w h)
                         ]
                             ++ shuffleOrbsF
                             ++ timeOrbsF
@@ -446,30 +450,47 @@ player =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ resizes Window
-        , moves Mouse
+        [ resizes windowMsg
+        , moves mouseMsg
         , diffs Step
         , Keyboard.downs (always TogglePause)
         ]
 
 
+windowMsg : Size -> Msg
+windowMsg s =
+    Window
+        ( winScale * toFloat s.width
+        , winScale * toFloat s.height
+        )
+
+
+mouseMsg : Position -> Msg
+mouseMsg m =
+    Mouse
+        ( toFloat m.x
+        , toFloat m.y
+        )
+
+
 initialCmd : Cmd Msg
 initialCmd =
     Cmd.batch
-        [ perform Window size
+        [ perform windowMsg size
         , newOrbs
         , newMaze
-        , perform GenMazeStart <|
-            Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze) <|
-                now
+        , perform GenMazeStart genMaze
         ]
+
+
+genMaze : Task Never Maze.Model
+genMaze =
+    Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze) now
 
 
 newMaze : Cmd Msg
 newMaze =
-    perform GenMaze <|
-        Task.map (\t -> Maze.generate (initialSeed <| round t) initMaze) <|
-            now
+    perform GenMaze genMaze
 
 
 newOrbs : Cmd Msg
