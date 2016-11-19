@@ -7,7 +7,7 @@ import Color exposing (Color, red, blue)
 import Utils exposing (..)
 import List exposing (..)
 import Tuple exposing (..)
-import List.Extra exposing (init, (!!), last, zip3, zip)
+import List.Extra exposing ((!!), zip3, zip)
 import Maybe exposing (andThen)
 import Debug
 
@@ -555,7 +555,7 @@ generate seed model =
         anyLeft =
             any (any .visited) model.grid
     in
-        case ( anyLeft, n, last model.stack ) of
+        case ( anyLeft, n, head model.stack ) of
             ( False, _, _ ) ->
                 model
 
@@ -568,7 +568,7 @@ generate seed model =
                         | current = i
                         , stack =
                             model.stack
-                                |> List.Extra.init
+                                |> tail
                                 |> Maybe.withDefault []
                     }
 
@@ -580,5 +580,5 @@ generate seed model =
                             |> (modifyCell (removeWall ((x + 3) % 6)) i)
                             |> (modifyCell (\c -> { c | visited = True }) i)
                     , current = i
-                    , stack = model.stack ++ [ model.current ]
+                    , stack = model.current :: model.stack
                     }
