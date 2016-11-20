@@ -312,17 +312,29 @@ view model =
                 , alpha = 0
             }
 
+        movingSettings mov =
+            { settings_
+                | cellFrom = model.cell
+                , cellTo = Just mov.nextCell
+                , alpha = Ease.inOutQuad mov.alpha
+            }
+
+        newMazeSettings m =
+            { settings_ | transition = Just model.newMaze }
+
         settings =
             case model.state of
                 Moving mov ->
-                    { settings_
-                        | cellFrom = model.cell
-                        , cellTo = Just mov.nextCell
-                        , alpha = Ease.inOutQuad mov.alpha
-                    }
+                    movingSettings mov
+
+                Pause (Moving mov) ->
+                    movingSettings mov
 
                 NewMaze m ->
-                    { settings_ | transition = Just model.newMaze }
+                    newMazeSettings m
+
+                Pause (NewMaze m) ->
+                    newMazeSettings m
 
                 _ ->
                     settings_
