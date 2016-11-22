@@ -1,22 +1,24 @@
 module Main exposing (..)
 
+import AnimationFrame exposing (..)
+import Collage exposing (..)
+import Color exposing (..)
+import Ease
+import Element exposing (toHtml, color)
 import Html exposing (..)
 import Html.Attributes exposing (style, attribute, class, href)
-import Task exposing (..)
-import Window exposing (..)
-import Mouse exposing (..)
 import Keyboard
-import Color exposing (..)
-import Element exposing (toHtml, color)
-import Collage exposing (..)
-import Maze
-import Ease
-import Utils exposing (..)
-import Random exposing (initialSeed)
-import AnimationFrame exposing (..)
-import Time exposing (Time, now)
 import List exposing (member)
+import Maze
+import Mouse exposing (..)
+import Random exposing (initialSeed)
+import Task exposing (..)
 import Text exposing (monospace, fromString)
+import Time exposing (Time, now)
+import Touch
+import SingleTouch as Touch
+import Utils exposing (..)
+import Window exposing (..)
 
 
 type State
@@ -46,7 +48,7 @@ type alias Model =
 
 
 
--- These need to be even (for consistancy throughout the code base)
+-- These need to be even (for consistency throughout the code base)
 
 
 ( mazeWidth, mazeHeight ) =
@@ -84,6 +86,7 @@ initialModel =
 type Msg
     = Window ( Float, Float )
     | Mouse Pos
+    | Touch Touch.Touch
     | Step Time
     | GenMaze Maze.Model
     | GenMazeStart Maze.Model
@@ -139,6 +142,9 @@ update msg model =
 
             ( Mouse p, _ ) ->
                 { model | mousePos = p } ! [ Cmd.none ]
+
+            ( Touch t, _ ) ->
+                { model | mousePos = ( t.clientX, t.clientY ) } ! [ Cmd.none ]
 
             ( Step dt, Choosing coolDown ) ->
                 let
@@ -369,6 +375,8 @@ view model =
                 , ( "height", toString h ++ "px" )
                 , ( "position", "relative" )
                 ]
+            , Touch.onSingleTouch Touch.TouchStart Touch.preventAndStop (Touch << .touch)
+            , Touch.onSingleTouch Touch.TouchMove Touch.preventAndStop (Touch << .touch)
             ]
             [ toHtml <|
                 color backgroundColor <|

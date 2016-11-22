@@ -1,15 +1,15 @@
 module Maze exposing (..)
 
-import Random exposing (Generator, Seed, step)
 import Collage exposing (..)
-import Transform exposing (translation, multiply)
 import Color exposing (Color, red, blue)
-import Utils exposing (..)
+import Debug
 import List exposing (..)
-import Tuple exposing (..)
 import List.Extra exposing ((!!), zip3, zip)
 import Maybe exposing (andThen)
-import Debug
+import Random exposing (Generator, Seed, step)
+import Transform exposing (translation, multiply)
+import Tuple exposing (..)
+import Utils exposing (..)
 
 
 -------------------------------------------------------------------------------
