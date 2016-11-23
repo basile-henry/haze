@@ -5,8 +5,10 @@ import Collage exposing (..)
 import Color exposing (..)
 import Ease
 import Element exposing (toHtml, color)
+import FontAwesome
 import Html exposing (..)
 import Html.Attributes exposing (style, attribute, class, href)
+import Html.Events
 import Keyboard
 import List exposing (member)
 import Maze
@@ -20,11 +22,6 @@ import Touch
 import SingleTouch as Touch
 import Utils exposing (..)
 import Window exposing (..)
-
-
--- Debug
-
-import Debug
 
 
 type State
@@ -95,7 +92,7 @@ initialModel =
     , points = 0
     , timeLeft = 130
     , fov = 300
-    , radius = 0
+    , radius = 1000
     , storedPowerUp = Nothing
     , currentPowerUp = Nothing
     }
@@ -112,6 +109,7 @@ type Msg
     | TogglePause
     | NewPowerUp Float
     | UsePowerUp
+    | Restart
 
 
 updateRadius : Model -> Float
@@ -134,6 +132,12 @@ update msg model =
         { model | state = GameOver } ! [ Cmd.none ]
     else
         case ( msg, model.state ) of
+            ( Restart, _ ) ->
+                initialModel ! [ initialCmd ]
+
+            ( _, GameOver ) ->
+                model ! [ Cmd.none ]
+
             ( TogglePause, Pause savedState ) ->
                 { model | state = savedState } ! [ Cmd.none ]
 
@@ -141,9 +145,6 @@ update msg model =
                 { model | state = Pause model.state } ! [ Cmd.none ]
 
             ( _, Pause _ ) ->
-                model ! [ Cmd.none ]
-
-            ( _, GameOver ) ->
                 model ! [ Cmd.none ]
 
             ( Window s, _ ) ->
@@ -373,6 +374,11 @@ view model =
         ( w, h ) =
             model.windowSize
 
+        ( wOffset, hOffset ) =
+            ( (w - min w h) / 2 + 10
+            , (h - min w h) / 2 + 10
+            )
+
         ( mx, my ) =
             model.mousePos
 
@@ -451,88 +457,136 @@ view model =
                 , ( "height", toString h ++ "px" )
                 , ( "position", "relative" )
                 ]
-            , Touch.onSingleTouch Touch.TouchStart Touch.preventAndStop (Touch << .touch)
-            , Touch.onSingleTouch Touch.TouchMove Touch.preventAndStop (Touch << .touch)
-            , Touch.onSingleTouch Touch.TouchEnd Touch.preventAndStop (always UsePowerUp)
             ]
-            [ toHtml <|
-                color backgroundColor <|
-                    collage (floor w) (floor h) <|
-                        [ Maze.draw
-                            settings
-                            model.maze
-                        , player
-                            |> filled
-                                (interpolateColor True shuffleColor wallColor <| Ease.inOutSine model.speedBonus)
-                            |> scale r
-                            |> rotate (atan2 y x)
-                        , gradient
-                            (radial
-                                ( 0, 0 )
-                                (0.7 * model.fov)
-                                ( 0, 0 )
-                                model.fov
-                                [ ( 0, backgroundColorT ), ( 1.0, backgroundColor ) ]
-                            )
-                            (rect w h)
-                        ]
-                            ++ shuffleOrbsF
-                            ++ timeOrbsF
-                            ++ powerUpOrbsF
-                            ++ [ model.points
-                                    |> toString
-                                    |> fromString
-                                    |> typefaced
-                                    |> Text.height 30
-                                    |> Text.color charcoal
-                                    |> Collage.text
-                                    |> moveY (model.fov - 20)
-                               ]
-                            ++ (case model.storedPowerUp of
-                                    Nothing ->
-                                        []
-
-                                    Just powerUp ->
-                                        [ powerUp
-                                            |> powerUpForm
-                                            |> moveY (40 - model.fov)
-                                        ]
-                               )
-                            ++ case model.state of
-                                GameOver ->
-                                    [ "Game Over"
-                                        |> fromString
-                                        |> typefaced
-                                        |> Text.height 80
-                                        |> Text.color charcoal
-                                        |> Collage.text
-                                    ]
-
-                                Pause _ ->
-                                    [ "Pause"
-                                        |> fromString
-                                        |> typefaced
-                                        |> Text.height 80
-                                        |> Text.color charcoal
-                                        |> Collage.text
-                                    ]
-
-                                NewMaze alpha ->
-                                    let
-                                        m =
-                                            5 * (0.7 - alpha)
-                                    in
-                                        [ "+25"
+            [ div
+                [ style
+                    [ ( "top", "0" )
+                    , ( "left", "0" )
+                    , ( "z-index", "1" )
+                    , ( "position", "absolute" )
+                    ]
+                , Touch.onSingleTouch Touch.TouchStart Touch.preventAndStop (Touch << .touch)
+                , Touch.onSingleTouch Touch.TouchMove Touch.preventAndStop (Touch << .touch)
+                ]
+                [ toHtml <|
+                    color backgroundColor <|
+                        collage (floor w) (floor h) <|
+                            [ Maze.draw
+                                settings
+                                model.maze
+                            , player
+                                |> filled
+                                    (interpolateColor True shuffleColor wallColor <| Ease.inOutSine model.speedBonus)
+                                |> scale r
+                                |> rotate (atan2 y x)
+                            , gradient
+                                (radial
+                                    ( 0, 0 )
+                                    (0.7 * model.fov)
+                                    ( 0, 0 )
+                                    model.fov
+                                    [ ( 0, backgroundColorT ), ( 1.0, backgroundColor ) ]
+                                )
+                                (rect w h)
+                            ]
+                                ++ shuffleOrbsF
+                                ++ timeOrbsF
+                                ++ powerUpOrbsF
+                                ++ case model.state of
+                                    GameOver ->
+                                        [ "Game Over"
                                             |> fromString
                                             |> typefaced
-                                            |> Text.height 30
+                                            |> Text.height 80
                                             |> Text.color charcoal
                                             |> Collage.text
-                                            |> Collage.move ( 20 * m, m ^ 4 )
                                         ]
 
-                                _ ->
-                                    []
+                                    Pause _ ->
+                                        [ "Pause"
+                                            |> fromString
+                                            |> typefaced
+                                            |> Text.height 80
+                                            |> Text.color charcoal
+                                            |> Collage.text
+                                        ]
+
+                                    NewMaze alpha ->
+                                        let
+                                            m =
+                                                5 * (0.7 - alpha)
+                                        in
+                                            [ "+25"
+                                                |> fromString
+                                                |> typefaced
+                                                |> Text.height 30
+                                                |> Text.color charcoal
+                                                |> Collage.text
+                                                |> Collage.move ( 20 * m, m ^ 4 )
+                                            ]
+
+                                    _ ->
+                                        []
+                ]
+            , div
+                [ style
+                    [ ( "position", "absolute" )
+                    , ( "z-index", "2" )
+                    , ( "top", "10px" )
+                    , ( "right", toString wOffset ++ "px" )
+                    , ( "font-size", "30px" )
+                    , ( "font-family", "helvetica, arial, sans-serif" )
+                    , ( "color", "rgb(85,87,83)" )
+                    ]
+                ]
+                [ Html.text <| toString model.points
+                ]
+            , div
+                [ style
+                    [ ( "position", "absolute" )
+                    , ( "z-index", "2" )
+                    , ( "bottom", "10px" )
+                    , ( "right", toString wOffset ++ "px" )
+                    , ( "font-size", "80px" )
+                    , ( "font-family", "helvetica, arial, sans-serif" )
+                    , ( "color", "rgb(230,220,40)" )
+                    ]
+                , Html.Events.onClick UsePowerUp
+                ]
+                (case model.storedPowerUp of
+                    Nothing ->
+                        []
+
+                    Just powerUp ->
+                        [ powerUpHtml powerUp ]
+                )
+            , div
+                [ style
+                    [ ( "position", "absolute" )
+                    , ( "top", "10px" )
+                    , ( "left", toString wOffset ++ "px" )
+                    , ( "z-index", "2" )
+                    ]
+                , Html.Events.onClick TogglePause
+                ]
+                [ case model.state of
+                    Pause _ ->
+                        FontAwesome.play_circle wallColor 50
+
+                    _ ->
+                        FontAwesome.pause_circle wallColor 50
+                ]
+            , div
+                [ style
+                    [ ( "position", "absolute" )
+                    , ( "top", "10px" )
+                    , ( "left", toString (60 + wOffset) ++ "px" )
+                    , ( "z-index", "2" )
+                    ]
+                , Html.Events.onClick Restart
+                ]
+                [ FontAwesome.refresh wallColor 50
+                ]
             ]
 
 
@@ -541,27 +595,17 @@ typefaced =
     typeface [ "helvetica", "arial", "sans-serif" ]
 
 
-powerUpForm : PowerUp -> Form
-powerUpForm powerUp =
+powerUpHtml : PowerUp -> Html Msg
+powerUpHtml powerUp =
     case powerUp of
         BreakWall ->
-            outlined { defaultLine | color = powerUpColor, width = 3 } (ngon 6 30)
+            FontAwesome.magic powerUpColor 80
 
         SpeedUp _ ->
-            let
-                l =
-                    path [ ( -25, 0 ), ( 0, 20 ), ( 25, 0 ) ]
-                        |> traced { defaultLine | color = powerUpColor, width = 3 }
-            in
-                group [ moveY 10 l, moveY -10 l ]
+            FontAwesome.angle_double_up powerUpColor 80
 
         GetPoints ->
-            "+50"
-                |> fromString
-                |> typefaced
-                |> Text.height 60
-                |> Text.color powerUpColor
-                |> Collage.text
+            Html.text "+50"
 
 
 player : Shape
@@ -590,7 +634,6 @@ subscriptions model =
         , moves mouseMsg
         , clicks (always UsePowerUp)
         , diffs Step
-        , Keyboard.downs (always TogglePause)
         ]
 
 
@@ -633,20 +676,6 @@ newMaze =
 newOrbs : Cmd Msg
 newOrbs =
     perform UpdateOrbs now
-
-
-
---indexGen : Maze.Index -> Random.Generator Maze.Index
---indexGen maxIndex =
---    let
---        ( x, y ) =
---            ( Random.int 0 maxIndex.x
---            , Random.int 0 maxIndex.y
---            )
---        g =
---            Random.pair x y
---    in
---        Random.map (\( x, y ) -> { x = x, y = y }) g
 
 
 allIndices : List Maze.Index
