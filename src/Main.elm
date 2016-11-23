@@ -12,7 +12,7 @@ import Html.Attributes exposing (style, attribute, class, type_)
 import Html.Events
 import Keyboard exposing (presses)
 import List exposing (member)
-import Maze
+import Maze exposing (defaultViewSettings)
 import Mouse exposing (..)
 import Random exposing (initialSeed)
 import Random.List
@@ -64,6 +64,7 @@ type alias Model =
     , lastPowerUp : PowerUp
     , storedPowerUp : Maybe PowerUp
     , currentPowerUp : Maybe PowerUp
+    , mazeForm : Form
     }
 
 
@@ -104,6 +105,7 @@ initialModel =
     , lastPowerUp = GetPoints
     , storedPowerUp = Nothing
     , currentPowerUp = Nothing
+    , mazeForm = group []
     }
 
 
@@ -268,14 +270,19 @@ update msg model =
                                 ( mt_, model.currentPowerUp )
                 in
                     (if mov.alpha + mt > 1.0 then
-                        { model
-                            | state = CheckOrbs
-                            , cell = Maze.getModuloIndex model.maze.grid mov.nextCell
-                            , points = model.points + 1
-                            , timeLeft = updateTimeLeft model dt
-                            , radius = updateRadius model
-                            , currentPowerUp = newCurrentPowerUp
-                        }
+                        let
+                            newCell =
+                                Maze.getModuloIndex model.maze.grid mov.nextCell
+                        in
+                            { model
+                                | state = CheckOrbs
+                                , cell = newCell
+                                , points = model.points + 1
+                                , timeLeft = updateTimeLeft model dt
+                                , radius = updateRadius model
+                                , currentPowerUp = newCurrentPowerUp
+                                , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) newCell model.fov model.radius
+                            }
                      else
                         { model
                             | state = Moving { mov | alpha = mov.alpha + mt }
@@ -294,6 +301,7 @@ update msg model =
                         , points = model.points + 25
                         , timeLeft = updateTimeLeft model dt
                         , radius = updateRadius model
+                        , mazeForm = Maze.drawMaze model.maze (Just model.newMaze) ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
                     }
                         ! [ newOrbs ]
                 else if member model.cell model.timeOrbs then
@@ -306,6 +314,7 @@ update msg model =
                             min 150 <| model.timeLeft + 30.7876 - inSeconds dt
                             -- 30.7876 is a multiple of 0.7 * 2 * pi (no animation skip animation for the orbs pulsing)
                         , radius = updateRadius model
+                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.radius + 30)
                     }
                         ! [ newOrbs ]
                 else if member model.cell model.powerUpOrbs then
@@ -332,6 +341,7 @@ update msg model =
                             Choosing 0.7
                             -- a bit more time than usual
                         , radius = updateRadius model
+                        , mazeForm = Maze.drawMaze model.newMaze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
                     }
                         ! [ newMaze ]
                 else
@@ -348,7 +358,11 @@ update msg model =
                 { model | newMaze = m } ! [ Cmd.none ]
 
             ( GenMazeStart m, _ ) ->
-                { model | maze = m } ! [ newMaze ]
+                { model
+                    | maze = m
+                    , mazeForm = Maze.drawMaze m Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.fov / 10)
+                }
+                    ! [ newMaze ]
 
             ( UpdateOrbs t, _ ) ->
                 let
@@ -418,11 +432,8 @@ view model =
             , h / 2 - my
             )
 
-        settings__ =
-            Maze.defaultViewSettings
-
         settings_ =
-            { settings__
+            { defaultViewSettings
                 | radius = model.radius
                 , cellFrom = model.cell
                 , alpha = 0
@@ -430,13 +441,9 @@ view model =
 
         movingSettings mov =
             { settings_
-                | cellFrom = model.cell
-                , cellTo = Just mov.nextCell
+                | cellTo = Just mov.nextCell
                 , alpha = Ease.inOutQuad mov.alpha
             }
-
-        newMazeSettings m =
-            { settings_ | transition = Just model.newMaze }
 
         settings =
             case model.state of
@@ -446,23 +453,14 @@ view model =
                 Pause (Moving mov) ->
                     movingSettings mov
 
-                NewMaze m ->
-                    newMazeSettings m
-
-                Pause (NewMaze m) ->
-                    newMazeSettings m
-
                 _ ->
                     settings_
-
-        r =
-            settings.radius / settings.scale
 
         -- adjusting for scaling
         func color colorT orb =
             orb
                 |> Maze.getRelativeCellPos ( mazeWidth, mazeHeight ) settings.radius pos
-                |> drawOrbs r model.fov model.timeLeft color colorT
+                |> drawOrbs model.radius model.fov model.timeLeft color colorT
 
         pos =
             interpolatePos
@@ -505,11 +503,11 @@ view model =
                         collage (floor w) (floor h) <|
                             [ Maze.draw
                                 settings
-                                model.maze
+                                model.mazeForm
                             , player
                                 |> filled
                                     (interpolateColor True shuffleColor wallColor <| Ease.inOutSine model.speedBonus)
-                                |> scale r
+                                |> scale (model.radius / 2)
                                 |> rotate (atan2 y x)
                             , gradient
                                 (radial
@@ -544,14 +542,18 @@ view model =
                                         ]
 
                                     NewMaze alpha ->
-                                        [ "+25"
-                                            |> fromString
-                                            |> typefaced
-                                            |> Text.height 30
-                                            |> Text.color charcoal
-                                            |> Collage.text
-                                            |> Collage.move ( model.fov * alpha / 0.7, model.fov * (alpha / 0.7) ^ 4 )
-                                        ]
+                                        let
+                                            dt =
+                                                1 - alpha / 0.7
+                                        in
+                                            [ "+25"
+                                                |> fromString
+                                                |> typefaced
+                                                |> Text.height 30
+                                                |> Text.color charcoal
+                                                |> Collage.text
+                                                |> Collage.move ( model.fov * dt, model.fov * dt ^ 4 )
+                                            ]
 
                                     _ ->
                                         []
@@ -841,10 +843,10 @@ drawOrbs radius maxRadius t f b ( x, y ) =
                 ( x, y )
 
         r =
-            radius * (0.2 + (abs <| sin (t * 0.7)) * max 0 (1.5 - sqrDist / sqrMaxRadius))
+            radius * (0.1 + (abs <| sin (t * 0.7)) * max 0 (0.75 - sqrDist / sqrMaxRadius))
 
         g =
-            radial ( 0, 0 ) (0.1 * radius) ( 0, 0 ) r [ ( 0, f ), ( 0.9, b ) ]
+            radial ( 0, 0 ) (0.05 * radius) ( 0, 0 ) r [ ( 0, f ), ( 0.9, b ) ]
     in
         move pos <| gradient g <| circle r
 

@@ -47,9 +47,6 @@ type alias ViewSettings =
     , cellFrom : Index
     , cellTo : Maybe Index
     , alpha : Float
-    , scale : Float
-    , dims : ( Int, Int )
-    , transition : Maybe Model
     }
 
 
@@ -61,13 +58,10 @@ type alias ViewSettings =
 
 defaultViewSettings : ViewSettings
 defaultViewSettings =
-    { radius = 15
+    { radius = 1000
     , cellFrom = { x = 0, y = 0 }
     , cellTo = Nothing
     , alpha = 0
-    , scale = 2
-    , dims = ( 15, 15 )
-    , transition = Nothing
     }
 
 
@@ -87,6 +81,11 @@ init w h =
         , current = { x = 0, y = 0 }
         , stack = []
         }
+
+
+renderRadius : Float
+renderRadius =
+    35.0
 
 
 
@@ -155,7 +154,7 @@ drawSegment color radius segIndex =
             solid color
     in
         traced
-            { lineStyle | width = 1 }
+            lineStyle
             (segment
                 (getPos radius segIndex)
                 (getPos radius <| (segIndex + 1) % 6)
@@ -170,19 +169,19 @@ getTransform : ViewSettings -> Transform.Transform
 getTransform settings =
     let
         a =
-            getCellPos (settings.radius) settings.cellFrom
+            getCellPos renderRadius settings.cellFrom
 
         b =
             settings.cellTo
-                |> Maybe.map (getCellPos settings.radius)
+                |> Maybe.map (getCellPos renderRadius)
                 |> Maybe.withDefault a
 
         ( dx, dy ) =
             interpolatePos a b settings.alpha
     in
         multiply
+            (Transform.scale (settings.radius / renderRadius))
             (translation (-dx) (-dy))
-            (Transform.scale settings.scale)
 
 
 sqrt3 : Float
@@ -209,83 +208,92 @@ drawCell index hexOutline hexWalls model transition =
 -- Main draw function
 
 
-draw : ViewSettings -> Model -> Form
-draw settings model =
+draw : ViewSettings -> Form -> Form
+draw settings mazeForm =
     let
-        radius =
-            settings.radius / settings.scale
-
-        hexOutline =
-            drawCellOutline radius
-
-        hexWalls =
-            zip3 (drawWalls wallColor radius)
-                (drawWalls shuffleColor radius)
-                (drawWalls timeColor radius)
-
-        ( width, height ) =
-            settings.dims
-
-        center =
-            settings.cellFrom
-
-        ( startX, startY ) =
-            ( center.x - width // 2
-            , center.y - height // 2
-            )
-
-        ( endX, endY ) =
-            ( center.x + width // 2
-            , center.y + height // 2
-            )
-
         highlightedCell =
             case settings.cellTo of
                 Nothing ->
                     group []
 
                 Just c ->
-                    ngon 6 radius
+                    ngon 6 renderRadius
                         |> filled hexBackgroundColor
-                        |> move (getCellPos radius c)
+                        |> move (getCellPos renderRadius c)
     in
         groupTransform
             (getTransform settings)
-            << (::) highlightedCell
-        <|
+            [ highlightedCell, mazeForm ]
+
+
+drawMaze : Model -> Maybe Model -> ( Int, Int ) -> Index -> Float -> Float -> Form
+drawMaze model transition ( mazeWidth, mazeHeight ) curentCell fov radius =
+    let
+        n =
+            ceiling (fov / radius)
+
+        ( fromX, toX, fromY, toY ) =
+            ( curentCell.x - n
+            , curentCell.x + n
+            , curentCell.y - n
+            , curentCell.y + n
+            )
+
+        hexOutline =
+            drawCellOutline renderRadius
+
+        hexWalls =
+            zip3 (drawWalls wallColor renderRadius)
+                (drawWalls shuffleColor renderRadius)
+                (drawWalls timeColor renderRadius)
+
+        maze =
             map
                 (\y ->
                     groupTransform
                         (translation
                             0
-                            (sqrt3 * radius * toFloat y)
+                            (sqrt3 * renderRadius * toFloat y)
                         )
                     <|
                         map
                             (\x ->
                                 groupTransform
                                     (translation
-                                        (1.5 * radius * toFloat x)
+                                        (1.5 * renderRadius * toFloat x)
                                         (if isEven x then
                                             0
                                          else
-                                            sqrt3 / 2 * radius
+                                            sqrt3 / 2 * renderRadius
                                         )
                                     )
                                 <|
                                     drawCell
-                                        { x = x, y = y }
+                                        { x = x % mazeWidth, y = y % mazeHeight }
                                         hexOutline
                                         hexWalls
                                         model
-                                        settings.transition
+                                        transition
                             )
-                            (range startX endX)
+                            (range fromX toX)
                 )
-                (range startY endY)
+                (range fromY toY)
+    in
+        group maze
 
 
 
+--group
+--    [ group maze
+--    , groupTransform (translation w 0) maze
+--    , groupTransform (translation w h) maze
+--    , groupTransform (translation 0 h) maze
+--    , groupTransform (translation -w h) maze
+--    , groupTransform (translation -w 0) maze
+--    , groupTransform (translation -w -h) maze
+--    , groupTransform (translation 0 -h) maze
+--    , groupTransform (translation w -h) maze
+--    ]
 -------------------------------------------------------------------------------
 -- Hex grid utils
 -------------------------------------------------------------------------------
