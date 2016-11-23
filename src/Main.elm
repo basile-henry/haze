@@ -1,15 +1,16 @@
 module Main exposing (..)
 
 import AnimationFrame exposing (..)
+import Char exposing (toCode)
 import Collage exposing (..)
 import Color exposing (..)
 import Ease
 import Element exposing (toHtml, color)
 import FontAwesome
 import Html exposing (..)
-import Html.Attributes exposing (style, attribute, class, href)
+import Html.Attributes exposing (style, attribute, class, type_)
 import Html.Events
-import Keyboard
+import Keyboard exposing (presses)
 import List exposing (member)
 import Maze
 import Mouse exposing (..)
@@ -25,7 +26,8 @@ import Window exposing (..)
 
 
 type State
-    = Moving { nextCell : Maze.Index, alpha : Float }
+    = Welcome
+    | Moving { nextCell : Maze.Index, alpha : Float }
     | CheckOrbs
     | Choosing Float
     | NewMaze Float
@@ -81,7 +83,7 @@ initialModel : Model
 initialModel =
     { windowSize = ( 0, 0 )
     , mousePos = ( 0, 0 )
-    , state = Choosing 2.0
+    , state = Welcome
     , speedBonus = 0
     , maze = initMaze
     , newMaze = initMaze
@@ -110,11 +112,13 @@ type Msg
     | NewPowerUp Float
     | UsePowerUp
     | Restart
+    | NoOp
+    | DismissWelcome
 
 
 updateRadius : Model -> Float
 updateRadius model =
-    0.7 * model.radius + 0.3 * model.fov * 15 / model.timeLeft
+    0.8 * model.radius + 0.2 * model.fov * 15 / model.timeLeft
 
 
 updateTimeLeft : Model -> Float -> Float
@@ -132,14 +136,23 @@ update msg model =
         { model | state = GameOver } ! [ Cmd.none ]
     else
         case ( msg, model.state ) of
+            ( DismissWelcome, _ ) ->
+                { model | state = Choosing 2.0 } ! [ Cmd.none ]
+
             ( Restart, _ ) ->
-                initialModel ! [ initialCmd ]
+                { initialModel | state = Choosing 2.0 } ! [ initialCmd ]
+
+            ( NoOp, _ ) ->
+                model ! [ Cmd.none ]
 
             ( _, GameOver ) ->
                 model ! [ Cmd.none ]
 
             ( TogglePause, Pause savedState ) ->
                 { model | state = savedState } ! [ Cmd.none ]
+
+            ( TogglePause, Welcome ) ->
+                model ! [ Cmd.none ]
 
             ( TogglePause, _ ) ->
                 { model | state = Pause model.state } ! [ Cmd.none ]
@@ -316,6 +329,9 @@ update msg model =
                     }
                         ! [ Cmd.none ]
 
+            ( Step _, Welcome ) ->
+                { model | radius = updateRadius model } ! [ Cmd.none ]
+
             ( GenMaze m, _ ) ->
                 { model | newMaze = m } ! [ Cmd.none ]
 
@@ -374,10 +390,8 @@ view model =
         ( w, h ) =
             model.windowSize
 
-        ( wOffset, hOffset ) =
-            ( (w - min w h) / 2 + 10
-            , (h - min w h) / 2 + 10
-            )
+        wOffset =
+            max 10 <| (w - min w h) / 2
 
         ( mx, my ) =
             model.mousePos
@@ -456,9 +470,10 @@ view model =
                 [ ( "width", toString w ++ "px" )
                 , ( "height", toString h ++ "px" )
                 , ( "position", "relative" )
+                , ( "font-family", "helvetica, arial, sans-serif" )
                 ]
             ]
-            [ div
+            ([ div
                 [ style
                     [ ( "top", "0" )
                     , ( "left", "0" )
@@ -528,28 +543,26 @@ view model =
                                     _ ->
                                         []
                 ]
-            , div
+             , div
                 [ style
                     [ ( "position", "absolute" )
                     , ( "z-index", "2" )
                     , ( "top", "10px" )
                     , ( "right", toString wOffset ++ "px" )
-                    , ( "font-size", "30px" )
-                    , ( "font-family", "helvetica, arial, sans-serif" )
+                    , ( "font-size", "50px" )
                     , ( "color", "rgb(85,87,83)" )
                     ]
                 ]
                 [ Html.text <| toString model.points
                 ]
-            , div
+             , div
                 [ style
                     [ ( "position", "absolute" )
                     , ( "z-index", "2" )
                     , ( "bottom", "10px" )
                     , ( "right", toString wOffset ++ "px" )
-                    , ( "font-size", "80px" )
-                    , ( "font-family", "helvetica, arial, sans-serif" )
-                    , ( "color", "rgb(230,220,40)" )
+                    , ( "font-size", "50px" )
+                    , ( "color", "rgb(230,220,20)" )
                     ]
                 , Html.Events.onClick UsePowerUp
                 ]
@@ -560,7 +573,7 @@ view model =
                     Just powerUp ->
                         [ powerUpHtml powerUp ]
                 )
-            , div
+             , div
                 [ style
                     [ ( "position", "absolute" )
                     , ( "top", "10px" )
@@ -574,9 +587,9 @@ view model =
                         FontAwesome.play_circle wallColor 50
 
                     _ ->
-                        FontAwesome.pause_circle wallColor 50
+                        FontAwesome.pause_circle shuffleColor 50
                 ]
-            , div
+             , div
                 [ style
                     [ ( "position", "absolute" )
                     , ( "top", "10px" )
@@ -585,9 +598,87 @@ view model =
                     ]
                 , Html.Events.onClick Restart
                 ]
-                [ FontAwesome.refresh wallColor 50
+                [ FontAwesome.refresh timeColor 50
                 ]
-            ]
+             ]
+                ++ case model.state of
+                    Welcome ->
+                        [ div
+                            [ style
+                                [ ( "position", "absolute" )
+                                , ( "top", "70px" )
+                                , ( "width", toString w ++ "px" )
+                                , ( "z-index", "3" )
+                                ]
+                            ]
+                            [ div
+                                [ style
+                                    [ ( "position", "relative" )
+                                    , ( "margin", "0px auto" )
+                                    , ( "width", "30%" )
+                                    , ( "min-width", "300px" )
+                                    , ( "padding", "10px" )
+                                    , ( "border-radius", "10px" )
+                                    , ( "background-color", "rgba(50,50,50,0.6)" )
+                                    , ( "color", "white" )
+                                    ]
+                                , Html.Events.onClick DismissWelcome
+                                ]
+                                [ h1 [ style [ ( "text-align", "center" ), ( "width", "100%" ) ] ] [ Html.text "Haze" ]
+                                , hr [ style [ ( "width", "200px" ), ( "margin", "0px auto 20px auto" ), ( "color", "white" ) ] ] []
+                                , h2 [] [ Html.text "How to play:" ]
+                                , ul
+                                    [ style [ ( "margin", "0px 0px 1em 0px" ) ] ]
+                                    [ li [] [ Html.text "Choose direction with your mouse/touch" ]
+                                    , li [] [ Html.text "Increase your speed by chaining valid moves" ]
+                                    , li
+                                        []
+                                        [ Html.text "Collect the orbs:"
+                                        , ul
+                                            [ type_ "none" ]
+                                            (let
+                                                orbElement c t =
+                                                    li
+                                                        [ style [ ( "text-align", "left" ) ] ]
+                                                        [ div [ style [ ( "display", "inline" ) ] ] [ FontAwesome.circle c 20 ]
+                                                        , div [ style [ ( "display", "inline" ), ( "height", "20px" ), ( "margin", "auto 10px" ) ] ] [ Html.text t ]
+                                                        ]
+                                             in
+                                                [ orbElement timeColor "More time"
+                                                , orbElement shuffleColor "Shuffle the maze"
+                                                , orbElement powerUpColor "Power ups"
+                                                ]
+                                            )
+                                        ]
+                                    , li
+                                        []
+                                        [ Html.text "Click anywhere or tap on the icon to use the power ups:"
+                                        , ul
+                                            [ type_ "none" ]
+                                            (let
+                                                orbElement icon t =
+                                                    li
+                                                        [ style [ ( "text-align", "left" ) ] ]
+                                                        [ div [ style [ ( "display", "inline" ) ] ] [ icon ]
+                                                        , div [ style [ ( "display", "inline" ), ( "height", "20px" ), ( "margin", "auto 10px" ) ] ] [ Html.text t ]
+                                                        ]
+                                             in
+                                                [ orbElement (FontAwesome.magic powerUpColor 20) "Go through a wall"
+                                                , orbElement (FontAwesome.angle_double_up powerUpColor 20) "Speed boost"
+                                                , orbElement (div [ style [ ( "display", "inline" ), ( "font-size", "20px" ), ( "color", "rgb(230,220,20)" ) ] ] [ Html.text "+50" ]) "More points"
+                                                ]
+                                            )
+                                        ]
+                                    , li [] [ Html.text "Get as many points as possible!" ]
+                                    ]
+                                , Html.h2 [ style [ ( "text-align", "center" ), ( "width", "100%" ) ] ] [ Html.text "Click to Start!" ]
+                                ]
+                            ]
+                        ]
+
+                    _ ->
+                        []
+            )
 
 
 typefaced : Text -> Text
@@ -599,10 +690,10 @@ powerUpHtml : PowerUp -> Html Msg
 powerUpHtml powerUp =
     case powerUp of
         BreakWall ->
-            FontAwesome.magic powerUpColor 80
+            FontAwesome.magic powerUpColor 50
 
         SpeedUp _ ->
-            FontAwesome.angle_double_up powerUpColor 80
+            FontAwesome.angle_double_up powerUpColor 70
 
         GetPoints ->
             Html.text "+50"
@@ -632,8 +723,17 @@ subscriptions model =
     Sub.batch
         [ resizes windowMsg
         , moves mouseMsg
-        , clicks (always UsePowerUp)
         , diffs Step
+        , presses
+            (\key ->
+                if key == toCode ' ' then
+                    TogglePause
+                else if key == toCode 'r' || key == toCode 'R' then
+                    Restart
+                else
+                    NoOp
+            )
+        , clicks (always UsePowerUp)
         ]
 
 
