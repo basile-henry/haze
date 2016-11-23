@@ -451,9 +451,9 @@ view model =
                 , ( "height", toString h ++ "px" )
                 , ( "position", "relative" )
                 ]
-            , Touch.onSingleTouch Touch.TouchStart Touch.preventAndStop (always UsePowerUp)
             , Touch.onSingleTouch Touch.TouchStart Touch.preventAndStop (Touch << .touch)
             , Touch.onSingleTouch Touch.TouchMove Touch.preventAndStop (Touch << .touch)
+            , Touch.onSingleTouch Touch.TouchEnd Touch.preventAndStop (always UsePowerUp)
             ]
             [ toHtml <|
                 color backgroundColor <|
