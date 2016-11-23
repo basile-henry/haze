@@ -25,6 +25,11 @@ import Utils exposing (..)
 import Window exposing (..)
 
 
+-- Debug
+
+import Debug
+
+
 type State
     = Welcome
     | Moving { nextCell : Maze.Index, alpha : Float }
@@ -56,6 +61,7 @@ type alias Model =
     , timeLeft : Time
     , fov : Float
     , radius : Float
+    , lastPowerUp : PowerUp
     , storedPowerUp : Maybe PowerUp
     , currentPowerUp : Maybe PowerUp
     }
@@ -95,6 +101,7 @@ initialModel =
     , timeLeft = 130
     , fov = 300
     , radius = 1000
+    , lastPowerUp = GetPoints
     , storedPowerUp = Nothing
     , currentPowerUp = Nothing
     }
@@ -133,14 +140,19 @@ updateTimeLeft model dt =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     if model.timeLeft < 15 then
-        { model | state = GameOver } ! [ Cmd.none ]
+        case msg of
+            Restart ->
+                { initialModel | state = Choosing 2.0 } ! [ initialCmd ]
+
+            _ ->
+                { model | state = GameOver } ! [ Cmd.none ]
     else
         case ( msg, model.state ) of
             ( DismissWelcome, _ ) ->
                 { model | state = Choosing 2.0 } ! [ Cmd.none ]
 
             ( Restart, _ ) ->
-                { initialModel | state = Choosing 2.0 } ! [ initialCmd ]
+                { initialModel | state = Debug.log "restarting" <| Choosing 2.0 } ! [ initialCmd ]
 
             ( NoOp, _ ) ->
                 model ! [ Cmd.none ]
@@ -368,9 +380,14 @@ update msg model =
                             |> initialSeed
 
                     ( ( powerUp, _ ), _ ) =
-                        Random.step (Random.List.choose [ BreakWall, SpeedUp 3, GetPoints ]) seed
+                        Random.step
+                            ([ BreakWall, SpeedUp 3, GetPoints ]
+                                |> List.filter ((/=) model.lastPowerUp)
+                                |> Random.List.choose
+                            )
+                            seed
                 in
-                    { model | storedPowerUp = powerUp } ! [ Cmd.none ]
+                    { model | storedPowerUp = powerUp, lastPowerUp = Maybe.withDefault GetPoints powerUp } ! [ Cmd.none ]
 
             ( UsePowerUp, _ ) ->
                 case model.storedPowerUp of
@@ -527,18 +544,14 @@ view model =
                                         ]
 
                                     NewMaze alpha ->
-                                        let
-                                            m =
-                                                5 * (0.7 - alpha)
-                                        in
-                                            [ "+25"
-                                                |> fromString
-                                                |> typefaced
-                                                |> Text.height 30
-                                                |> Text.color charcoal
-                                                |> Collage.text
-                                                |> Collage.move ( 20 * m, m ^ 4 )
-                                            ]
+                                        [ "+25"
+                                            |> fromString
+                                            |> typefaced
+                                            |> Text.height 30
+                                            |> Text.color charcoal
+                                            |> Collage.text
+                                            |> Collage.move ( model.fov * alpha / 0.7, model.fov * (alpha / 0.7) ^ 4 )
+                                        ]
 
                                     _ ->
                                         []
@@ -561,8 +574,6 @@ view model =
                     , ( "z-index", "2" )
                     , ( "bottom", "10px" )
                     , ( "right", toString wOffset ++ "px" )
-                    , ( "font-size", "50px" )
-                    , ( "color", "rgb(230,220,20)" )
                     ]
                 , Html.Events.onClick UsePowerUp
                 ]
@@ -616,7 +627,7 @@ view model =
                                     [ ( "position", "relative" )
                                     , ( "margin", "0px auto" )
                                     , ( "width", "30%" )
-                                    , ( "min-width", "300px" )
+                                    , ( "min-width", "400px" )
                                     , ( "padding", "10px" )
                                     , ( "border-radius", "10px" )
                                     , ( "background-color", "rgba(50,50,50,0.6)" )
@@ -656,22 +667,22 @@ view model =
                                         , ul
                                             [ type_ "none" ]
                                             (let
-                                                orbElement icon t =
+                                                orbElement f t =
                                                     li
                                                         [ style [ ( "text-align", "left" ) ] ]
-                                                        [ div [ style [ ( "display", "inline" ) ] ] [ icon ]
+                                                        [ div [ style [ ( "display", "inline" ) ] ] [ f powerUpColor 20 ]
                                                         , div [ style [ ( "display", "inline" ), ( "height", "20px" ), ( "margin", "auto 10px" ) ] ] [ Html.text t ]
                                                         ]
                                              in
-                                                [ orbElement (FontAwesome.magic powerUpColor 20) "Go through a wall"
-                                                , orbElement (FontAwesome.angle_double_up powerUpColor 20) "Speed boost"
-                                                , orbElement (div [ style [ ( "display", "inline" ), ( "font-size", "20px" ), ( "color", "rgb(230,220,20)" ) ] ] [ Html.text "+50" ]) "More points"
+                                                [ orbElement FontAwesome.magic "Go through a wall"
+                                                , orbElement FontAwesome.angle_double_up "Speed boost"
+                                                , orbElement FontAwesome.trophy "Bonus 50 points"
                                                 ]
                                             )
                                         ]
                                     , li [] [ Html.text "Get as many points as possible!" ]
                                     ]
-                                , Html.h2 [ style [ ( "text-align", "center" ), ( "width", "100%" ) ] ] [ Html.text "Click to Start!" ]
+                                , Html.h2 [ style [ ( "text-align", "center" ), ( "width", "100%" ) ] ] [ Html.text "Click/Tap to Start!" ]
                                 ]
                             ]
                         ]
@@ -693,10 +704,10 @@ powerUpHtml powerUp =
             FontAwesome.magic powerUpColor 50
 
         SpeedUp _ ->
-            FontAwesome.angle_double_up powerUpColor 70
+            FontAwesome.angle_double_up powerUpColor 50
 
         GetPoints ->
-            Html.text "+50"
+            FontAwesome.trophy powerUpColor 50
 
 
 player : Shape
