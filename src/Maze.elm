@@ -6,7 +6,8 @@ import Debug
 import List exposing (..)
 import List.Extra exposing ((!!), zip3, zip)
 import Maybe exposing (andThen)
-import Random exposing (Generator, Seed, step)
+import Random exposing (Seed, step)
+import Random.List
 import Transform exposing (translation, multiply)
 import Tuple exposing (..)
 import Utils exposing (..)
@@ -362,6 +363,7 @@ getPos radius index =
 getModuloIndex : List (List Cell) -> Index -> Index
 getModuloIndex grid i =
     case grid of
+        -- technically wrong but will be caught later on
         [] ->
             Index 0 0
 
@@ -369,7 +371,6 @@ getModuloIndex grid i =
         [] :: _ ->
             Index 0 0
 
-        -- technically wrong but will be caught later on
         row :: _ ->
             Index (i.x % length row) (i.y % length grid)
 
@@ -515,17 +516,11 @@ availableNeighbours model =
 
 pickNext : Seed -> Model -> ( Maybe ( Int, Index ), Seed )
 pickNext seed model =
-    let
-        ns =
-            availableNeighbours model
-
-        ( i, newSeed ) =
-            step (Random.int 0 (length ns - 1)) seed
-    in
-        if isEmpty ns then
-            ( Nothing, seed )
-        else
-            ( ns !! i, newSeed )
+    model
+        |> availableNeighbours
+        |> Random.List.choose
+        |> flip step seed
+        |> Tuple.mapFirst Tuple.first
 
 
 

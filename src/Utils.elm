@@ -78,6 +78,16 @@ shuffleColorT =
     rgba 255 73 92 0
 
 
+powerUpColor : Color
+powerUpColor =
+    rgb 230 220 40
+
+
+powerUpColorT : Color
+powerUpColorT =
+    rgba 230 220 40 0
+
+
 interpolateFloat : Float -> Float -> Float -> Float
 interpolateFloat a b dt =
     (1 - dt) * a + dt * b
