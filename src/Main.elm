@@ -642,8 +642,8 @@ view model =
                                 , h2 [] [ Html.text "How to play:" ]
                                 , ul
                                     [ style [ ( "margin", "0px 0px 1em 0px" ) ] ]
-                                    [ li [] [ Html.text "Choose direction with your mouse/touch" ]
-                                    , li [] [ Html.text "Increase your speed by chaining valid moves" ]
+                                    [ li [] [ Html.text "Choose a direction with your mouse/touch" ]
+                                    , li [] [ Html.text "Increase speed with multiple valid moves in a row" ]
                                     , li
                                         []
                                         [ Html.text "Collect the orbs:"
