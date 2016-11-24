@@ -134,7 +134,7 @@ updateTimeLeft : Model -> Float -> Float
 updateTimeLeft model dt =
     let
         mult =
-            1 + 4 * (min 1500 <| toFloat model.points) / 1500
+            1.5 + 4 * (min 1500 <| toFloat model.points) / 1500
     in
         model.timeLeft - (mult * inSeconds dt)
 
@@ -264,7 +264,7 @@ update msg model =
                                 if t - dts < 0 then
                                     ( mt_, Nothing )
                                 else
-                                    ( 6 * dts, Just (SpeedUp <| t - dts) )
+                                    ( 4.5 * dts, Just (SpeedUp <| t - dts) )
 
                             _ ->
                                 ( mt_, model.currentPowerUp )
@@ -276,12 +276,11 @@ update msg model =
                         in
                             { model
                                 | state = CheckOrbs
-                                , cell = newCell
+                                , cell = Debug.log "Current cell:" newCell
                                 , points = model.points + 1
                                 , timeLeft = updateTimeLeft model dt
                                 , radius = updateRadius model
                                 , currentPowerUp = newCurrentPowerUp
-                                , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) newCell model.fov model.radius
                             }
                      else
                         { model
@@ -323,6 +322,7 @@ update msg model =
                         , powerUpOrbs = List.filter ((/=) model.cell) model.powerUpOrbs
                         , timeLeft = updateTimeLeft model dt
                         , radius = updateRadius model
+                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
                     }
                         ! [ newOrbs, perform NewPowerUp now ]
                 else
@@ -330,6 +330,7 @@ update msg model =
                         | state = Choosing 0.5
                         , timeLeft = updateTimeLeft model dt
                         , radius = updateRadius model
+                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
                     }
                         ! [ Cmd.none ]
 
@@ -360,7 +361,7 @@ update msg model =
             ( GenMazeStart m, _ ) ->
                 { model
                     | maze = m
-                    , mazeForm = Maze.drawMaze m Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.fov / 10)
+                    , mazeForm = Maze.drawMaze m Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.fov / 5)
                 }
                     ! [ newMaze ]
 
@@ -682,7 +683,7 @@ view model =
                                                 ]
                                             )
                                         ]
-                                    , li [] [ Html.text "Get as many points as possible!" ]
+                                    , li [] [ Html.text "Get as many points as possible while the field of view (time left) shrinks!" ]
                                     ]
                                 , Html.h2 [ style [ ( "text-align", "center" ), ( "width", "100%" ) ] ] [ Html.text "Click/Tap to Start!" ]
                                 ]
