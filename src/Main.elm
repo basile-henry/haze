@@ -269,7 +269,6 @@ update msg model =
                             newCell =
                                 mov.dir
                                     |> Maze.getNeighbour model.cell
-                                    |> Maze.getModuloIndex model.maze.dim
 
                             newCellPos =
                                 toString <| Maze.getCellPos Maze.renderRadius newCell
@@ -296,46 +295,50 @@ update msg model =
                         ! [ Cmd.none ]
 
             ( Step dt, CheckOrbs ) ->
-                if member model.cell model.shuffleOrbs then
-                    { model
-                        | state = NewMaze 0.7
-                        , shuffleOrbs = List.filter ((/=) model.cell) model.shuffleOrbs
-                        , points = model.points + 25
-                        , timeLeft = updateTimeLeft model dt
-                        , radius = updateRadius model
-                        , mazeForm = Maze.drawMaze model.maze (Just model.newMaze) ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
-                    }
-                        ! [ newOrbs ]
-                else if member model.cell model.timeOrbs then
-                    { model
-                        | state =
-                            Choosing 0.7
-                            -- a bit more time than usual
-                        , timeOrbs = List.filter ((/=) model.cell) model.timeOrbs
-                        , timeLeft =
-                            min 150 <| model.timeLeft + 30.7876 - inSeconds dt
-                            -- 30.7876 is a multiple of 0.7 * 2 * pi (no animation skip animation for the orbs pulsing)
-                        , radius = updateRadius model
-                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.radius + 30)
-                    }
-                        ! [ newOrbs ]
-                else if member model.cell model.powerUpOrbs then
-                    { model
-                        | state = Choosing 0.7
-                        , powerUpOrbs = List.filter ((/=) model.cell) model.powerUpOrbs
-                        , timeLeft = updateTimeLeft model dt
-                        , radius = updateRadius model
-                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
-                    }
-                        ! [ newOrbs, perform NewPowerUp now ]
-                else
-                    { model
-                        | state = Choosing 0.5
-                        , timeLeft = updateTimeLeft model dt
-                        , radius = updateRadius model
-                        , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
-                    }
-                        ! [ Cmd.none ]
+                let
+                    c =
+                        Maze.getModuloIndex model.maze.dim model.cell
+                in
+                    if member c model.shuffleOrbs then
+                        { model
+                            | state = NewMaze 0.7
+                            , shuffleOrbs = List.filter ((/=) c) model.shuffleOrbs
+                            , points = model.points + 25
+                            , timeLeft = updateTimeLeft model dt
+                            , radius = updateRadius model
+                            , mazeForm = Maze.drawMaze model.maze (Just model.newMaze) ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
+                        }
+                            ! [ newOrbs ]
+                    else if member c model.timeOrbs then
+                        { model
+                            | state =
+                                Choosing 0.7
+                                -- a bit more time than usual
+                            , timeOrbs = List.filter ((/=) c) model.timeOrbs
+                            , timeLeft =
+                                min 150 <| model.timeLeft + 30.7876 - inSeconds dt
+                                -- 30.7876 is a multiple of 0.7 * 2 * pi (no animation skip animation for the orbs pulsing)
+                            , radius = updateRadius model
+                            , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov (model.radius + 30)
+                        }
+                            ! [ newOrbs ]
+                    else if member c model.powerUpOrbs then
+                        { model
+                            | state = Choosing 0.7
+                            , powerUpOrbs = List.filter ((/=) c) model.powerUpOrbs
+                            , timeLeft = updateTimeLeft model dt
+                            , radius = updateRadius model
+                            , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
+                        }
+                            ! [ newOrbs, perform NewPowerUp now ]
+                    else
+                        { model
+                            | state = Choosing 0.5
+                            , timeLeft = updateTimeLeft model dt
+                            , radius = updateRadius model
+                            , mazeForm = Maze.drawMaze model.maze Nothing ( mazeWidth, mazeHeight ) model.cell model.fov model.radius
+                        }
+                            ! [ Cmd.none ]
 
             ( Step dt, NewMaze alpha ) ->
                 if alpha < 0.0 then
@@ -370,17 +373,20 @@ update msg model =
 
             ( UpdateOrbs t, _ ) ->
                 let
+                    c =
+                        Maze.getModuloIndex model.maze.dim model.cell
+
                     seed =
                         initialSeed <| round t
 
                     ( newShuffleOrbs, seed_ ) =
-                        updateOrbList 15 seed (model.cell :: model.timeOrbs ++ model.powerUpOrbs) model.shuffleOrbs
+                        updateOrbList 15 seed (c :: model.timeOrbs ++ model.powerUpOrbs) model.shuffleOrbs
 
                     ( newTimeOrbs, seed__ ) =
-                        updateOrbList 20 seed_ (model.cell :: newShuffleOrbs ++ model.powerUpOrbs) model.timeOrbs
+                        updateOrbList 20 seed_ (c :: newShuffleOrbs ++ model.powerUpOrbs) model.timeOrbs
 
                     ( newPowerUpOrbs, _ ) =
-                        updateOrbList 7 seed__ (model.cell :: newShuffleOrbs ++ newTimeOrbs) model.powerUpOrbs
+                        updateOrbList 7 seed__ (c :: newShuffleOrbs ++ newTimeOrbs) model.powerUpOrbs
                 in
                     { model
                         | shuffleOrbs = newShuffleOrbs
@@ -467,13 +473,16 @@ view model =
                 |> drawOrbs model.radius model.fov model.timeLeft color colorT
 
         cellPos =
-            Maze.getCellPos model.radius model.cell
+            model.cell
+                |> Maze.getModuloIndex model.maze.dim
+                |> Maze.getCellPos model.radius
 
         pos =
             interpolatePos
                 cellPos
                 (settings.dir
-                    |> Maybe.map (Maze.getCellPos model.radius << Maze.getNeighbour model.cell)
+                    |> Maybe.map (Maze.getNeighbour (Maze.getModuloIndex model.maze.dim model.cell))
+                    |> Maybe.map (Maze.getCellPos model.radius)
                     |> Maybe.withDefault cellPos
                 )
                 settings.alpha
@@ -487,15 +496,6 @@ view model =
         powerUpOrbsF =
             List.map (func powerUpColor powerUpColorT) model.powerUpOrbs
     in
-        {- div
-           [ style
-               [ ( "width", "100%" )
-               , ( "height", "100%" )
-               ]
-           ]
-           [ toHtml model.mazeForm
-           ]
-        -}
         div
             [ style
                 [ ( "width", toString w ++ "px" )

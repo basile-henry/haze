@@ -97,7 +97,7 @@ init w h =
 
 renderRadius : Float
 renderRadius =
-    35.0
+    500.0
 
 
 
@@ -115,7 +115,7 @@ drawCellOutline radius =
             solid outlineColor
     in
         traced
-            { lineStyle | width = 0.5 }
+            { lineStyle | width = 5 }
             (path <| map (getPos radius) [ 0, 1, 2, 3 ])
 
 
@@ -166,7 +166,7 @@ drawSegment color radius segIndex =
             solid color
     in
         traced
-            lineStyle
+            { lineStyle | width = 20 }
             (segment
                 (getPos radius segIndex)
                 (getPos radius <| (segIndex + 1) % 6)
