@@ -27,7 +27,7 @@ import Window exposing (..)
 
 type State
     = Welcome
-    | Moving { nextCell : Maze.Index, alpha : Float }
+    | Moving { dir : Int, alpha : Float }
     | CheckOrbs
     | Choosing Float
     | NewMaze Float
@@ -175,10 +175,10 @@ update msg model =
                         s
 
                     fov =
-                        0.95 * min (w / 2) (h / 2)
+                        0.95 * (min w h) / 2
                 in
                     { model
-                        | windowSize = s
+                        | windowSize = ( 0.98 * w, 0.98 * h )
                         , fov = fov
                     }
                         ! [ Cmd.none ]
@@ -215,7 +215,7 @@ update msg model =
                         { model
                             | state =
                                 Moving
-                                    { nextCell = Maze.getNeighbour model.cell dir
+                                    { dir = dir
                                     , alpha = 0
                                     }
                             , speedBonus =
@@ -267,11 +267,19 @@ update msg model =
                     (if mov.alpha + mt > 1.0 then
                         let
                             newCell =
-                                Maze.getModuloIndex model.maze.dim mov.nextCell
+                                mov.dir
+                                    |> Maze.getNeighbour model.cell
+                                    |> Maze.getModuloIndex model.maze.dim
+
+                            newCellPos =
+                                toString <| Maze.getCellPos Maze.renderRadius newCell
+
+                            oldCellPos =
+                                toString <| Maze.getCellPos Maze.renderRadius model.cell
                         in
                             { model
                                 | state = CheckOrbs
-                                , cell = newCell
+                                , cell = Debug.log ("Old: " ++ oldCellPos ++ " New: " ++ newCellPos ++ " at: ") newCell
                                 , points = model.points + 1
                                 , timeLeft = updateTimeLeft model dt
                                 , radius = updateRadius model
@@ -431,13 +439,13 @@ view model =
         settings_ =
             { defaultViewSettings
                 | radius = model.radius
-                , cellFrom = model.cell
+                , cell = model.cell
                 , alpha = 0
             }
 
         movingSettings mov =
             { settings_
-                | cellTo = Just mov.nextCell
+                | dir = Just mov.dir
                 , alpha = Ease.inOutQuad mov.alpha
             }
 
@@ -458,12 +466,15 @@ view model =
                 |> Maze.getRelativeCellPos ( mazeWidth, mazeHeight ) settings.radius pos
                 |> drawOrbs model.radius model.fov model.timeLeft color colorT
 
+        cellPos =
+            Maze.getCellPos model.radius model.cell
+
         pos =
             interpolatePos
-                (Maze.getCellPos settings.radius model.cell)
-                (settings.cellTo
-                    |> Maybe.withDefault model.cell
-                    |> Maze.getCellPos settings.radius
+                cellPos
+                (settings.dir
+                    |> Maybe.map (Maze.getCellPos model.radius << Maze.getNeighbour model.cell)
+                    |> Maybe.withDefault cellPos
                 )
                 settings.alpha
 
@@ -476,6 +487,15 @@ view model =
         powerUpOrbsF =
             List.map (func powerUpColor powerUpColorT) model.powerUpOrbs
     in
+        {- div
+           [ style
+               [ ( "width", "100%" )
+               , ( "height", "100%" )
+               ]
+           ]
+           [ toHtml model.mazeForm
+           ]
+        -}
         div
             [ style
                 [ ( "width", toString w ++ "px" )
@@ -486,8 +506,8 @@ view model =
             ]
             ([ div
                 [ style
-                    [ ( "top", "0" )
-                    , ( "left", "0" )
+                    [ ( "top", "0px" )
+                    , ( "left", "0px" )
                     , ( "z-index", "1" )
                     , ( "position", "absolute" )
                     ]

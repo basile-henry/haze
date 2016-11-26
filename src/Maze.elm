@@ -55,8 +55,8 @@ type alias Model =
 
 type alias ViewSettings =
     { radius : Float
-    , cellFrom : Index
-    , cellTo : Maybe Index
+    , cell : Index
+    , dir : Maybe Int
     , alpha : Float
     }
 
@@ -70,8 +70,8 @@ type alias ViewSettings =
 defaultViewSettings : ViewSettings
 defaultViewSettings =
     { radius = 1000
-    , cellFrom = { x = 0, y = 0 }
-    , cellTo = Nothing
+    , cell = { x = 0, y = 0 }
+    , dir = Nothing
     , alpha = 0
     }
 
@@ -181,19 +181,19 @@ getTransform : ViewSettings -> Transform.Transform
 getTransform settings =
     let
         a =
-            getCellPos renderRadius settings.cellFrom
+            getCellPos settings.radius settings.cell
 
         b =
-            settings.cellTo
-                |> Maybe.map (getCellPos renderRadius)
+            settings.dir
+                |> Maybe.map (getCellPos settings.radius << getNeighbour settings.cell)
                 |> Maybe.withDefault a
 
         ( dx, dy ) =
             interpolatePos a b settings.alpha
     in
         multiply
-            (Transform.scale (settings.radius / renderRadius))
             (translation (-dx) (-dy))
+            (Transform.scale (settings.radius / renderRadius))
 
 
 sqrt3 : Float
@@ -222,14 +222,14 @@ draw : ViewSettings -> Form -> Form
 draw settings mazeForm =
     let
         highlightedCell =
-            case settings.cellTo of
+            case settings.dir of
                 Nothing ->
                     group []
 
-                Just c ->
+                Just d ->
                     ngon 6 renderRadius
                         |> filled hexBackgroundColor
-                        |> move (getCellPos renderRadius c)
+                        |> move (getCellPos renderRadius <| getNeighbour settings.cell d)
     in
         groupTransform
             (getTransform settings)
