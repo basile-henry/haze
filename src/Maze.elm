@@ -1,14 +1,16 @@
 module Maze exposing (..)
 
+import Array exposing (Array, get)
+import Array.Extra exposing (update)
 import Collage exposing (..)
-import Color exposing (Color, red, blue)
+import Color exposing (Color, blue, red)
 import Debug
 import List exposing (..)
-import List.Extra exposing ((!!), zip3, zip)
+import List.Extra exposing ((!!), zip, zip3)
 import Maybe exposing (andThen)
 import Random exposing (Seed, step)
 import Random.List
-import Transform exposing (translation, multiply)
+import Transform exposing (multiply, translation)
 import Tuple exposing (..)
 import Utils exposing (..)
 
@@ -16,6 +18,14 @@ import Utils exposing (..)
 -------------------------------------------------------------------------------
 -- Types
 -------------------------------------------------------------------------------
+
+
+type alias Grid =
+    Array (Array Cell)
+
+
+type alias Dim =
+    ( Int, Int )
 
 
 type alias Index =
@@ -36,9 +46,10 @@ type alias Cell =
 
 
 type alias Model =
-    { grid : List (List Cell)
+    { grid : Grid
     , current : Index
     , stack : List Index
+    , dim : Dim
     }
 
 
@@ -74,12 +85,13 @@ init w h =
             }
     in
         { grid =
-            modifyCell (\c -> { c | visited = True }) { x = 0, y = 0 } <|
-                repeat h <|
-                    repeat w <|
+            modifyCell (\c -> { c | visited = True }) { x = 0, y = 0 } ( w, h ) <|
+                Array.repeat h <|
+                    Array.repeat w <|
                         initCell
         , current = { x = 0, y = 0 }
         , stack = []
+        , dim = ( w, h )
         }
 
 
@@ -191,17 +203,15 @@ sqrt3 =
 
 drawCell : Index -> Form -> List ( Form, Form, Form ) -> Model -> Maybe Model -> List Form
 drawCell index hexOutline hexWalls model transition =
-    case ( getCell index model.grid, transition |> andThen (\m -> getCell index m.grid) ) of
+    case ( getCell index model.dim model.grid, transition |> andThen (\m -> getCell index m.dim m.grid) ) of
         ( Nothing, _ ) ->
             []
 
         ( Just c, Nothing ) ->
-            (::) hexOutline <|
-                drawCellWalls (map (\( w, _, _ ) -> w) hexWalls) c
+            hexOutline :: drawCellWalls (map (\( w, _, _ ) -> w) hexWalls) c
 
         ( Just a, Just b ) ->
-            (::) hexOutline <|
-                drawTransitionWalls hexWalls a b
+            hexOutline :: drawTransitionWalls hexWalls a b
 
 
 
@@ -243,7 +253,8 @@ drawMaze model transition ( mazeWidth, mazeHeight ) curentCell fov radius =
             drawCellOutline renderRadius
 
         hexWalls =
-            zip3 (drawWalls wallColor renderRadius)
+            zip3
+                (drawWalls wallColor renderRadius)
                 (drawWalls shuffleColor renderRadius)
                 (drawWalls timeColor renderRadius)
 
@@ -283,17 +294,6 @@ drawMaze model transition ( mazeWidth, mazeHeight ) curentCell fov radius =
 
 
 
---group
---    [ group maze
---    , groupTransform (translation w 0) maze
---    , groupTransform (translation w h) maze
---    , groupTransform (translation 0 h) maze
---    , groupTransform (translation -w h) maze
---    , groupTransform (translation -w 0) maze
---    , groupTransform (translation -w -h) maze
---    , groupTransform (translation 0 -h) maze
---    , groupTransform (translation w -h) maze
---    ]
 -------------------------------------------------------------------------------
 -- Hex grid utils
 -------------------------------------------------------------------------------
@@ -315,7 +315,7 @@ getCellPos radius index =
             ( newX, newY + sqrt3 / 2 * radius )
 
 
-getRelativeCellPos : ( Int, Int ) -> Float -> Pos -> Index -> Pos
+getRelativeCellPos : Dim -> Float -> Pos -> Index -> Pos
 getRelativeCellPos ( w_, h_ ) radius ( x, y ) index =
     let
         ( w, h ) =
@@ -368,60 +368,35 @@ getPos radius index =
         ( radius * cos angle, radius * sin angle )
 
 
-getModuloIndex : List (List Cell) -> Index -> Index
-getModuloIndex grid i =
-    case grid of
-        -- technically wrong but will be caught later on
-        [] ->
-            Index 0 0
-
-        -- technically wrong but will be caught later on
-        [] :: _ ->
-            Index 0 0
-
-        row :: _ ->
-            Index (i.x % length row) (i.y % length grid)
+getModuloIndex : Dim -> Index -> Index
+getModuloIndex ( w, h ) i =
+    Index (i.x % w) (i.y % h)
 
 
 
 -- Get a cell from the grid if it exists
 
 
-getCell : Index -> List (List Cell) -> Maybe Cell
-getCell i grid =
+getCell : Index -> Dim -> Grid -> Maybe Cell
+getCell i dim grid =
     let
         { x, y } =
-            getModuloIndex grid i
+            getModuloIndex dim i
     in
-        (grid !! y) |> andThen (\r -> r !! x)
+        (get y grid) |> andThen (\r -> get x r)
 
 
 
 -- Modify a cell in the grid at a given index
 
 
-modifyCell : (Cell -> Cell) -> Index -> List (List Cell) -> List (List Cell)
-modifyCell f i grid =
+modifyCell : (Cell -> Cell) -> Index -> Dim -> Grid -> Grid
+modifyCell f i dim grid =
     let
         { x, y } =
-            getModuloIndex grid i
-
-        maybeGrid =
-            Maybe.map2
-                (\c r ->
-                    take y grid
-                        ++ [ take x r ++ [ f c ] ++ drop (x + 1) r ]
-                        ++ drop (y + 1) grid
-                )
-                (getCell i grid)
-                (grid !! y)
+            getModuloIndex dim i
     in
-        case maybeGrid of
-            Nothing ->
-                grid
-
-            Just g ->
-                g
+        update y (update x f) grid
 
 
 
@@ -481,7 +456,7 @@ validDirections : Model -> Index -> List Int
 validDirections model index =
     filterMap
         (\i ->
-            (getCell index model.grid)
+            (getCell index model.dim model.grid)
                 |> andThen (\c -> c.walls !! i)
                 |> andThen
                     (\w ->
@@ -506,7 +481,7 @@ availableNeighbours : Model -> List ( Int, Index )
 availableNeighbours model =
     filterMap
         (\( i, index ) ->
-            (getCell index model.grid)
+            (getCell index model.dim model.grid)
                 |> andThen
                     (\c ->
                         if c.visited then
@@ -545,6 +520,11 @@ removeWall x cell =
     }
 
 
+arrayAny : (a -> Bool) -> Array a -> Bool
+arrayAny f =
+    Array.foldl ((||) << f) False
+
+
 
 -- Given a random seed, generate a maze using a simple recursive backtracker algorithm
 
@@ -556,7 +536,7 @@ generate seed model =
             pickNext seed model
 
         anyLeft =
-            any (any .visited) model.grid
+            arrayAny (arrayAny .visited) model.grid
     in
         case ( anyLeft, n, head model.stack ) of
             ( False, _, _ ) ->
@@ -577,11 +557,12 @@ generate seed model =
 
             ( _, Just ( x, i ), _ ) ->
                 generate newSeed <|
-                    { grid =
-                        model.grid
-                            |> (modifyCell (removeWall x) model.current)
-                            |> (modifyCell (removeWall ((x + 3) % 6)) i)
-                            |> (modifyCell (\c -> { c | visited = True }) i)
-                    , current = i
-                    , stack = model.current :: model.stack
+                    { model
+                        | grid =
+                            model.grid
+                                |> (modifyCell (removeWall x) model.current model.dim)
+                                |> (modifyCell (removeWall ((x + 3) % 6)) i model.dim)
+                                |> (modifyCell (\c -> { c | visited = True }) i model.dim)
+                        , current = i
+                        , stack = model.current :: model.stack
                     }

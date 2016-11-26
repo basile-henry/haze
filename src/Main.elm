@@ -5,10 +5,10 @@ import Char exposing (toCode)
 import Collage exposing (..)
 import Color exposing (..)
 import Ease
-import Element exposing (toHtml, color)
+import Element exposing (color, toHtml)
 import FontAwesome
 import Html exposing (..)
-import Html.Attributes exposing (style, attribute, class, type_)
+import Html.Attributes exposing (attribute, class, style, type_)
 import Html.Events
 import Keyboard exposing (presses)
 import List exposing (member)
@@ -17,17 +17,12 @@ import Mouse exposing (..)
 import Random exposing (initialSeed)
 import Random.List
 import Task exposing (..)
-import Text exposing (Text, typeface, fromString)
-import Time exposing (Time, now, inMilliseconds, inSeconds)
+import Text exposing (Text, fromString, typeface)
+import Time exposing (Time, inMilliseconds, inSeconds, now)
 import Touch
 import SingleTouch as Touch
 import Utils exposing (..)
 import Window exposing (..)
-
-
--- Debug
-
-import Debug
 
 
 type State
@@ -154,7 +149,7 @@ update msg model =
                 { model | state = Choosing 2.0 } ! [ Cmd.none ]
 
             ( Restart, _ ) ->
-                { initialModel | state = Debug.log "restarting" <| Choosing 2.0 } ! [ initialCmd ]
+                { initialModel | state = Choosing 2.0 } ! [ initialCmd ]
 
             ( NoOp, _ ) ->
                 model ! [ Cmd.none ]
@@ -272,11 +267,11 @@ update msg model =
                     (if mov.alpha + mt > 1.0 then
                         let
                             newCell =
-                                Maze.getModuloIndex model.maze.grid mov.nextCell
+                                Maze.getModuloIndex model.maze.dim mov.nextCell
                         in
                             { model
                                 | state = CheckOrbs
-                                , cell = Debug.log "Current cell:" newCell
+                                , cell = newCell
                                 , points = model.points + 1
                                 , timeLeft = updateTimeLeft model dt
                                 , radius = updateRadius model
